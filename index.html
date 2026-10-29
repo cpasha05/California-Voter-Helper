@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>California Voter Helper</title>
+<meta name="description" content="Quick answers about registering to vote and voting in California. No login needed.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#10242E; --muted:#4A5E69; --paper:#EAF1F4; --card:#FFFFFF;
+    --navy:#0E3A4F; --navy-ink:#FFFFFF; --poppy:#F2A100; --poppy-ink:#2B1B00;
+    --line:#C9D7DE; --link:#0B5A86; --chip:#FFFFFF; --chip-hover:#FFF4D9;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#E8F0F3; --muted:#A9BCC6; --paper:#0B1A22; --card:#13262F;
+      --navy:#1B5673; --navy-ink:#FFFFFF; --poppy:#F2B33D; --poppy-ink:#241700;
+      --line:#2A4552; --link:#8CCBF2; --chip:#13262F; --chip-hover:#2A3A2A;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:18px;line-height:1.5;display:flex;justify-content:center}
+  .app{width:100%;max-width:760px;height:100%;display:flex;flex-direction:column;background:var(--paper)}
+  header{background:var(--navy);color:var(--navy-ink);padding:16px 20px 14px;border-bottom:6px solid var(--poppy)}
+  header h1{margin:0;font-size:1.35rem;line-height:1.2}
+  header p{margin:4px 0 0;font-size:.95rem;opacity:.92}
+  .banner{background:var(--poppy);color:var(--poppy-ink);padding:10px 20px;font-size:.95rem;font-weight:700}
+  .banner[hidden]{display:none}
+  #log{flex:1;overflow-y:auto;padding:18px 16px 8px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+  .msg{max-width:88%;padding:12px 15px;border-radius:14px;border:1px solid var(--line);background:var(--card);overflow-wrap:anywhere}
+  .msg p{margin:0 0 .6em}
+  .msg p:last-child{margin-bottom:0}
+  .msg ul,.msg ol{margin:.3em 0 .6em;padding-left:1.25em}
+  .msg li{margin:.2em 0}
+  .msg a{color:var(--link);font-weight:700}
+  .msg.bot{align-self:flex-start;border-top-left-radius:4px}
+  .msg.user{align-self:flex-end;background:var(--navy);color:var(--navy-ink);border-color:var(--navy);border-top-right-radius:4px}
+  .msg.typing{color:var(--muted);font-style:italic}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;padding:4px 16px 10px}
+  .chip{font:inherit;font-size:.95rem;padding:9px 14px;border-radius:999px;border:2px solid var(--navy);
+    background:var(--chip);color:var(--ink);cursor:pointer}
+  .chip:hover{background:var(--chip-hover)}
+  .chip:focus-visible,#q:focus-visible,#send:focus-visible,a:focus-visible{outline:3px solid var(--poppy);outline-offset:2px}
+  form{display:flex;gap:8px;padding:10px 16px 12px;border-top:1px solid var(--line);background:var(--card)}
+  #q{flex:1;font:inherit;padding:12px 14px;border-radius:10px;border:2px solid var(--line);background:var(--paper);color:var(--ink);min-width:0}
+  #send{font:inherit;font-weight:700;padding:12px 18px;border-radius:10px;border:0;background:var(--navy);color:var(--navy-ink);cursor:pointer}
+  footer{padding:8px 16px 12px;font-size:.82rem;color:var(--muted);background:var(--card)}
+  footer a{color:var(--link)}
+  @media (prefers-reduced-motion: reduce){#log{scroll-behavior:auto}}
+  @media (max-width:480px){body{font-size:17px}.msg{max-width:94%}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>California Voter Helper</h1>
+    <p>Plain answers about registering and voting. Open any time, no login.</p>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
+  <div class="chips" id="chips" aria-label="Suggested questions"></div>
+  <form id="form" autocomplete="off">
+    <label for="q" style="position:absolute;left:-9999px">Type your question</label>
+    <input id="q" type="text" placeholder="Ask about registering, deadlines, mail ballots…" maxlength="200">
+    <button id="send" type="submit">Send</button>
+  </form>
+  <footer>
+    This is an independent helper and not an official government site. Always confirm important details with the
+    <a href="https://www.sos.ca.gov/elections/" target="_blank" rel="noopener">California Secretary of State</a>
+    or your county elections office.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- Dates for the November 3, 2026 General Election ---------- */
+  function endOf(y,m,d){ return new Date(y,m-1,d,23,59,59); }
+  var now = new Date();
+  var PHASE = now <= endOf(2026,10,19) ? "open"
+            : now <= endOf(2026,11,3)  ? "conditional"
+            : "over";
+
+  var HOTLINE = '<a href="tel:+18003458683">(800) 345-VOTE (8683)</a>';
+  var A = function(url,label){ return '<a href="'+url+'" target="_blank" rel="noopener">'+label+'</a>'; };
+  var REG = A("https://registertovote.ca.gov/","registertovote.ca.gov");
+  var SOS = A("https://www.sos.ca.gov/elections/","sos.ca.gov/elections");
+  var STATUS = A("https://voterstatus.sos.ca.gov/","voterstatus.sos.ca.gov");
+  var CENTERS = A("https://caearlyvoting.sos.ca.gov/","caearlyvoting.sos.ca.gov");
+
+  var overNote = '<p>The November 3, 2026 General Election has passed, so the dates below no longer apply. For the next election, check '+SOS+' for the calendar. The registration deadline is always 15 days before Election Day.</p>';
+
+  /* ---------- Topics ---------- */
+  var T = {};
+
+  T.greet = { html: function(){
+    return '<p>Hi, I’m the California Voter Helper. I can walk you through registering, deadlines, voting by mail, voting in person, and who to contact.</p><p>Tap a question below or type your own.</p>';
+  }, next: ["register","dates","mail","inperson","status","contact"] };
+
+  T.register = { label:"How do I register?", kw:["register","registration","sign up","signup","become a voter","enroll","apply to vote","new voter","first time"], html: function(){
+    if(PHASE==="over") return overNote + '<p>To register for a future election, apply online at '+REG+'. You will need a California driver’s license or ID number (or the last four digits of your Social Security number) and your date of birth.</p>';
+    var s = '<p>The fastest way is online at '+REG+'. It takes a few minutes and is available in 10 languages.</p>'
+      + '<p>Have these ready.</p><ul><li>Your California driver’s license or ID number, or the last four digits of your Social Security number</li><li>Your date of birth</li></ul>'
+      + '<p>No computer? Call '+HOTLINE+' or your county elections office and ask for a paper form to be mailed to you.</p>';
+    if(PHASE==="open") s += '<p><strong>Deadline for the November 3 election is Monday, October 19, 2026.</strong> Online applications must be in by then, and mailed forms must be postmarked by then.</p><p>If you miss it, you can still register and vote on the same day (see “Missed the deadline”).</p>';
+    else s += '<p><strong>The regular deadline for the November 3 election passed on October 19.</strong> You can still register and vote on the same day. Tap “Missed the deadline” for how.</p>';
+    return s;
+  }, next:["eligible","late","status","contact"] };
+
+  T.late = { label:"Missed the deadline", kw:["late","missed","too late","same day","same-day","conditional","election day registration","deadline passed","after the deadline"], html: function(){
+    if(PHASE==="over") return overNote;
+    return '<p>You can still take part. California offers <strong>same-day registration</strong>, also called conditional voter registration, for people who miss the deadline.</p>'
+      + '<ul><li>It is available from October 20 through Election Day, November 3, 2026.</li>'
+      + '<li>Go to your county elections office or a vote center, register, and vote a provisional ballot right there.</li>'
+      + '<li>Your ballot is counted once the county confirms your registration.</li>'
+      + '<li>You may be asked for ID, so bring a driver’s license, state ID, or another document that shows your name and address.</li></ul>'
+      + '<p>Find a location at '+CENTERS+'. On Election Day, vote centers are open 7 a.m. to 8 p.m.</p>';
+  }, next:["inperson","id","contact"] };
+
+  T.eligible = { label:"Am I eligible?", kw:["eligible","eligibility","can i vote","who can","qualify","citizen","felony","felon","age","old enough"], html: function(){
+    return '<p>You can register to vote in California if you are</p><ul><li>A U.S. citizen and a California resident</li><li>At least 18 years old on Election Day</li><li>Not currently serving a state or federal prison term for a felony</li><li>Not found mentally incompetent to vote by a court</li></ul>'
+      + '<p>Not sure about your own situation? Call '+HOTLINE+' or your county elections office. They can answer questions about specific cases.</p>';
+  }, next:["prereg","register","contact"] };
+
+  T.prereg = { label:"I’m 16 or 17", kw:["pre-register","preregister","pre register","16","17","teen","teenager","high school","under 18","not 18"], html: function(){
+    return '<p>You can <strong>pre-register</strong> at 16 or 17 if you meet the other requirements. Apply at '+REG+', and you will be registered automatically on your 18th birthday.</p><p>Pre-registering does not change the voting age. You still have to be 18 to cast a ballot.</p>';
+  }, next:["eligible","register","contact"] };
+
+  T.status = { label:"Check my registration", kw:["status","am i registered","check","registered","already registered","verify","look up","lookup","party"], html: function(){
+    return '<p>Three quick ways to check.</p><ul><li>Online with the My Voter Status tool at '+STATUS+'</li><li>Text <strong>VOTE</strong> to <strong>GOVOTE (468-683)</strong></li><li>Call '+HOTLINE+'</li></ul><p>It will also show your county and political party preference.</p>';
+  }, next:["moved","register","mail"] };
+
+  T.dates = { label:"Key dates", kw:["date","dates","when","deadline","deadlines","calendar","election day","timeline","schedule"], html: function(){
+    if(PHASE==="over") return overNote;
+    return '<p>Key dates for the <strong>November 3, 2026 General Election</strong>.</p><ul>'
+      + '<li><strong>October 5</strong> Counties begin mailing ballots</li>'
+      + '<li><strong>October 6</strong> Secure ballot drop boxes open</li>'
+      + '<li><strong>October 19</strong> Last day to register by the regular deadline</li>'
+      + '<li><strong>October 20 to November 3</strong> Same-day registration at county offices and vote centers</li>'
+      + '<li><strong>October 24</strong> First vote centers open in Voter’s Choice Act counties</li>'
+      + '<li><strong>October 31</strong> Remaining in-person vote centers open</li>'
+      + '<li><strong>November 3</strong> Election Day. Polls open 7 a.m. to 8 p.m.</li></ul>'
+      + '<p>Mailed ballots must be postmarked by November 3 and arrive within 7 days. The full calendar is at '+SOS+'.</p>';
+  }, next:["mail","inperson","late"] };
+
+  T.mail = { label:"Voting by mail", kw:["mail","vote by mail","mail-in","mail in","ballot","return","drop box","dropbox","drop off","postage","postmark","stamp"], html: function(){
+    if(PHASE==="over") return overNote + '<p>In general, every active registered voter is mailed a ballot before each election, and you can return it by mail, at a drop box, or in person.</p>';
+    return '<p>Every active registered voter in California is mailed a ballot, so you do not need to request one. County offices began mailing them by October 5.</p>'
+      + '<p>You can return it in any of these ways.</p><ul>'
+      + '<li><strong>By mail.</strong> Postage is prepaid. It must be postmarked on or before November 3 and reach your county within 7 days.</li>'
+      + '<li><strong>At a drop box.</strong> Secure drop boxes opened October 6.</li>'
+      + '<li><strong>In person.</strong> At your county elections office, a vote center, or a polling place by 8 p.m. on November 3.</li></ul>'
+      + '<p>Mail is slowing down now, so a drop box or vote center is the safest choice this close to Election Day. Sign your ballot envelope so it can be counted.</p>';
+  }, next:["noballot","track","inperson","dates"] };
+
+  T.noballot = { label:"I didn’t get my ballot", kw:["didn't get","didnt get","not received","never received","haven't received","havent received","lost","replacement","missing","damaged","mistake","spoiled","new ballot"], html: function(){
+    if(PHASE==="over") return overNote;
+    return '<p>You have options.</p><ul><li>Contact your county elections office right away to ask about a replacement ballot.</li><li>The last day to ask for a replacement by mail was October 27, but you can still vote in person at your county elections office or a vote center and get a ballot there.</li><li>Check '+STATUS+' to confirm your address and registration are current.</li></ul>'
+      + '<p>Not sure which county office to call? Ring '+HOTLINE+' and they will point you to it.</p>';
+  }, next:["inperson","moved","contact"] };
+
+  T.track = { label:"Track my ballot", kw:["track","where's my ballot","wheres my ballot","was my ballot counted","received my ballot","counted"], html: function(){
+    return '<p>You can sign up for <strong>Where’s My Ballot?</strong> to get updates when your ballot is mailed, received, and counted. Start at '+A("https://california.ballottrax.net/voter/","california.ballottrax.net/voter")+'.</p><p>You can also check your registration at '+STATUS+'.</p>';
+  }, next:["mail","status","contact"] };
+
+  T.inperson = { label:"Voting in person", kw:["in person","in-person","vote center","polling","polling place","where do i vote","where to vote","early voting","early","hours","open","location","near me"], html: function(){
+    if(PHASE==="over") return overNote;
+    return '<p>You can vote in person even if you got a mail ballot. Find the vote center, drop box, or polling place closest to you at '+CENTERS+'.</p>'
+      + '<ul><li>Early vote centers are generally open daily from 10 a.m. to 7 p.m. Some opened October 24 and the rest open October 31, so dates and hours vary a bit by county.</li>'
+      + '<li>On Election Day, November 3, they are open <strong>7 a.m. to 8 p.m.</strong></li>'
+      + '<li>If you are in line by 8 p.m., you can still vote.</li></ul>'
+      + '<p>Bring your mail ballot if you have it, or tell staff you want to vote there.</p>';
+  }, next:["id","late","mail","contact"] };
+
+  T.id = { label:"Do I need ID?", kw:["id","identification","photo id","driver","license","bring"], html: function(){
+    return '<p>Most California voters <strong>do not need to show ID</strong> to vote.</p><p>The exception is a first-time voter who registered by mail and did not give a driver’s license or ID number or the last four digits of a Social Security number. You may be asked to show ID, such as a photo ID or a document with your name and address. If you are unsure, bring one.</p><p>If you use same-day registration, bring ID or a document showing your name and address as well.</p>';
+  }, next:["inperson","register","contact"] };
+
+  T.moved = { label:"I moved or changed my name", kw:["moved","move","new address","address","change name","name change","married","party preference","re-register","reregister","update registration"], html: function(){
+    return '<p>You need to <strong>re-register</strong> if you move, change your name, or want to change your political party preference.</p><p>Update it online at '+REG+'. Ballots are not forwarded in the mail, so an old address can mean a missed ballot.</p><p>If you are past the deadline, you can fix it in person with same-day registration at a county elections office or vote center.</p>';
+  }, next:["late","status","contact"] };
+
+  T.language = { label:"Help in another language", kw:["spanish","espanol","español","chinese","hindi","japanese","khmer","korean","tagalog","thai","vietnamese","language","translate","interpreter"], html: function(){
+    return '<p>Voter information is available in 10 languages. The state registration form is offered in English, Spanish, Chinese, Hindi, Japanese, Khmer, Korean, Tagalog, Thai, and Vietnamese. You can call the Secretary of State’s voter hotline in each language.</p><ul>'
+      + '<li>English <a href="tel:+18003458683">(800) 345-8683</a></li>'
+      + '<li>Español <a href="tel:+18002328682">(800) 232-8682</a></li>'
+      + '<li>中文 <a href="tel:+18003392857">(800) 339-2857</a></li>'
+      + '<li>हिन्दी <a href="tel:+18883452692">(888) 345-2692</a></li>'
+      + '<li>日本語 <a href="tel:+18003392865">(800) 339-2865</a></li>'
+      + '<li>ខ្មែរ <a href="tel:+18883454917">(888) 345-4917</a></li>'
+      + '<li>한국어 <a href="tel:+18665751558">(866) 575-1558</a></li>'
+      + '<li>Tagalog <a href="tel:+18003392957">(800) 339-2957</a></li>'
+      + '<li>ภาษาไทย <a href="tel:+18553453933">(855) 345-3933</a></li>'
+      + '<li>Việt ngữ <a href="tel:+18003398163">(800) 339-8163</a></li></ul>';
+  }, next:["register","contact"] };
+
+  T.results = { label:"Election results", kw:["result","results","who won","winner","count","counting"], html: function(){
+    return '<p>Statewide results are posted after the polls close at 8 p.m. on Election Day at '+A("https://electionresults.sos.ca.gov/","electionresults.sos.ca.gov")+'. Counting continues for days afterward as mailed ballots arrive.</p>';
+  }, next:["track","contact"] };
+
+  T.guide = { label:"What’s on my ballot?", kw:["on my ballot","propositions","proposition","measures","voter guide","voter information guide","guide","candidates"], html: function(){
+    return '<p>The official Voter Information Guide explains the statewide contests and ballot measures. Read it online at '+A("https://voterguide.sos.ca.gov/","voterguide.sos.ca.gov")+'. Your county elections office can tell you about local contests.</p><p>I can’t recommend candidates or measures, but I’m happy to help with how and where to vote.</p>';
+  }, next:["inperson","mail","contact"] };
+
+  T.contact = { label:"Talk to a person", kw:["contact","phone","call","number","email","speak","human","person","representative","help","office","county","mailing address","write"], html: function(){
+    return '<p>I’m here around the clock, but if you need a person, here is who to reach.</p><ul>'
+      + '<li><strong>Secretary of State voter hotline</strong> '+HOTLINE+'</li>'
+      + '<li><strong>Email</strong> <a href="mailto:elections@sos.ca.gov">elections@sos.ca.gov</a></li>'
+      + '<li><strong>Your county elections office</strong> This is where your registration record is kept and usually the quickest route for local questions. Find yours at '+SOS+'.</li></ul>'
+      + '<p>Hotline hours are limited, so for anything you can’t wait on, a vote center is staffed on Election Day from 7 a.m. to 8 p.m.</p>';
+  }, next:["register","status","language"] };
+
+  T.opinion = { html: function(){
+    return '<p>I can’t say who or what to vote for. That choice is yours. I can help with registering, getting your ballot, and finding where to vote. The official Voter Information Guide at '+A("https://voterguide.sos.ca.gov/","voterguide.sos.ca.gov")+' explains what is on the ballot.</p>';
+  }, next:["guide","inperson","mail"], kw:["who should i vote","who to vote","democrat","republican","party should","best candidate","recommend a candidate"] };
+
+  T.thanks = { html: function(){ return '<p>You’re welcome. Anything else I can help with?</p>'; }, next:["register","dates","mail","inperson"], kw:["thanks","thank you","thx","ty"] };
+  T.hello  = { html: function(){ return T.greet.html(); }, next:T.greet.next, kw:["hello","hi","hey","good morning","good afternoon","start","menu"] };
+
+  T.fallback = { html: function(){
+    return '<p>I’m not sure I understood that. Try one of the topics below, or reach a person at '+HOTLINE+'.</p>';
+  }, next:["register","dates","mail","inperson","status","contact"] };
+
+  /* ---------- UI ---------- */
+  var log = document.getElementById("log");
+  var chips = document.getElementById("chips");
+  var form = document.getElementById("form");
+  var input = document.getElementById("q");
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var banner = document.getElementById("banner");
+  if(PHASE==="open"){ banner.textContent = "Election Day is November 3, 2026. Register by October 19."; banner.hidden=false; }
+  else if(PHASE==="conditional"){ banner.textContent = "Election Day is November 3, 2026. Same-day registration is open at vote centers."; banner.hidden=false; }
+
+  function addMsg(html, who){
+    var d = document.createElement("div");
+    d.className = "msg " + who;
+    if(who==="user"){ d.textContent = html; } else { d.innerHTML = html; }
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+    return d;
+  }
+
+  function showChips(ids){
+    chips.innerHTML = "";
+    ids.forEach(function(id){
+      var t = T[id]; if(!t || !t.label) return;
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.textContent = t.label;
+      b.addEventListener("click", function(){ ask(t.label, id); });
+      chips.appendChild(b);
+    });
+  }
+
+  function reply(id){
+    var t = T[id] || T.fallback;
+    var typing = addMsg("Typing…", "bot typing");
+    var wait = reduce ? 0 : 450;
+    setTimeout(function(){
+      typing.remove();
+      addMsg(t.html(), "bot");
+      showChips(t.next || T.fallback.next);
+    }, wait);
+  }
+
+  function norm(s){ return " " + s.toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿñæœ'\- ]/g," ").replace(/\s+/g," ").trim() + " "; }
+
+  function match(text){
+    var s = norm(text), best = null, bestScore = 0;
+    Object.keys(T).forEach(function(id){
+      var kw = T[id].kw; if(!kw) return;
+      var score = 0;
+      kw.forEach(function(k){
+        var needle = norm(k);
+        if(s.indexOf(needle) !== -1) score += needle.trim().length > 3 ? 2 + needle.trim().split(" ").length : 1;
+      });
+      if(id==="opinion" && score>0) score += 5;
+      if(score > bestScore){ bestScore = score; best = id; }
+    });
+    return best;
+  }
+
+  function ask(text, forcedId){
+    addMsg(text, "user");
+    reply(forcedId || match(text) || "fallback");
+  }
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    var v = input.value.trim(); if(!v) return;
+    input.value = "";
+    ask(v);
+  });
+
+  addMsg(T.greet.html(), "bot");
+  showChips(T.greet.next);
+})();
+</script>
+</body>
+</html>
