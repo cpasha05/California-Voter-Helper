@@ -68,6 +68,12 @@
   #send:hover{filter:brightness(1.15)}
   footer{padding:8px 18px 12px;font-size:.8rem;color:var(--muted);background:var(--card)}
   footer a{color:var(--link)}
+  .langbar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);font-size:.85rem;color:var(--muted)}
+  .langbar label{flex:none;font-weight:700}
+  #lang{flex:1;min-width:0;font:inherit;padding:6px 10px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink)}
+  #lang:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  .langbtn{font:inherit;font-weight:700;margin:3px 6px 3px 0;padding:6px 14px;border-radius:999px;border:2px solid var(--chip-line);background:var(--card);color:var(--ink);cursor:pointer}
+  .langbtn:hover,.langbtn:focus-visible{background:var(--accent-soft)}
   @media (prefers-reduced-motion: reduce){#log{scroll-behavior:auto}.dots i{animation:none;opacity:.6}.chip,.chip::before{transition:none}}
   @media (max-width:480px){body{font-size:17px}.msg{max-width:88%}}
 </style>
@@ -76,18 +82,19 @@
 <div class="app">
   <header>
     <div class="mark" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
-    <div class="titles"><h1>California Voter Helper</h1><p>Plain answers about registering and voting.</p></div>
-    <span class="tag">No login needed</span>
+    <div class="titles"><h1 id="t-title">California Voter Helper</h1><p id="t-sub">Plain answers about registering and voting.</p></div>
+    <span class="tag" id="t-tag">No login needed</span>
   </header>
+  <div class="langbar"><label for="lang">🌐 Language / Idioma / 语言</label><select id="lang"></select></div>
   <div class="banner" id="banner" hidden></div>
   <div id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
   <div class="chips" id="chips" aria-label="Suggested questions"></div>
   <form id="form" autocomplete="off">
-    <label for="q" style="position:absolute;left:-9999px">Type your question</label>
+    <label for="q" id="q-label" style="position:absolute;left:-9999px">Type your question</label>
     <input id="q" type="text" placeholder="Ask about registering, deadlines, mail ballots…" maxlength="200">
     <button id="send" type="submit">Send</button>
   </form>
-  <footer>
+  <footer id="foot">
     This is an independent helper and not an official government site. Always confirm important details with the
     <a href="https://www.sos.ca.gov/elections/" target="_blank" rel="noopener">California Secretary of State</a>
     or your county elections office.
@@ -219,8 +226,10 @@
     return '<p>You need to <strong>re-register</strong> if you move, change your name, or want to change your political party preference.</p><p>Update it online at '+REG+'. Ballots are not forwarded in the mail, so an old address can mean a missed ballot.</p><p>If you are past the deadline, you can fix it in person with same-day registration at a county elections office or vote center.</p>';
   }, next:["late","status","contact"] };
 
-  T.language = { label:"Help in another language", kw:["spanish","espanol","español","ayuda","donde","dónde","puedo","votar","registrarme","registrar","como","cómo","chinese","hindi","japanese","khmer","korean","tagalog","thai","vietnamese","language","translate","interpreter"], html: function(){
-    return '<p><strong>En español</strong> Puede llamar gratis a la línea de votantes al <a href="tel:+18002328682">(800) 232-VOTA (8682)</a>. También puede registrarse en '+REG+' (el sitio está disponible en español).</p><p>Voter information is available in 10 languages. The state registration form is offered in English, Spanish, Chinese, Hindi, Japanese, Khmer, Korean, Tagalog, Thai, and Vietnamese. You can call the Secretary of State’s voter hotline in each language.</p><ul>'
+  T.language = { label:"Help in another language", kw:["spanish","espanol","chinese","hindi","japanese","khmer","korean","tagalog","thai","vietnamese","language","languages","translate","translation","interpreter","other language","another language"], html: function(){
+    return '<p>I can answer in <strong>English, Español, 中文, Tiếng Việt, Tagalog and 한국어</strong>. Tap a language to switch, or use the menu at the top of the page. Translations were made with AI help, so please confirm important details with your county elections office.</p><p>'
+      + ["en","es","zh","vi","tl","ko"].map(function(c){ return '<button type="button" class="langbtn" data-lang="'+c+'">'+I18N[c].name+'</button>'; }).join("")
+      + '</p><p>The state’s voter hotline also answers in 10 languages.</p><ul>'
       + '<li>English <a href="tel:+18003458683">(800) 345-8683</a></li>'
       + '<li>Español <a href="tel:+18002328682">(800) 232-8682</a></li>'
       + '<li>中文 <a href="tel:+18003392857">(800) 339-2857</a></li>'
@@ -301,17 +310,374 @@
     return '<p>I’m not sure I understood that. Try rewording it with a few key words, such as “register,” “mail ballot,” “deadline,” or “vote center,” or tap a topic below. To reach a person, call '+HOTLINE+' or ask your county elections office.</p>';
   }, next:["register","dates","mail","inperson","transit","contact"] };
 
+  var I18N = {};
+  /* ---------- Shorter language packs built from one template ---------- */
+  function buildSimple(code, name, hotNum, hotTel, sp){
+    var HOTL = '<a href="tel:'+hotTel+'">'+hotNum+'</a>';
+    var fill = function(s){ return s.replace(/\{(\w+)\}/g,function(m,k){ return ({REG:REG,SOS:SOS,STATUS:STATUS,CENTERS:CENTERS,HOT:HOTL,MAIN:HOTLINE})[k]||m; }); };
+    var P = { code:code, name:name, ui:sp.ui, topics:{} };
+    P.ui.fallback = fill(sp.fallback);
+    P.ui.onlyEnglish = fill(sp.onlyEnglish);
+    var X = P.topics, k = sp.kw, s = sp.s;
+    function add(id, label, nextIds, fn, extra){
+      var o = { kw:k[id]||[], next:nextIds, html:function(){ return fill(fn()); } };
+      if(label) o.label = label;
+      if(extra) for(var e in extra) o[e]=extra[e];
+      X[id]=o;
+    }
+    add("greet","",["register","dates","mail","inperson","status","contact"],function(){ return s.greet; });
+    add("register",sp.labels.register,["eligible","late","status","contact"],function(){
+      var r = s.reg;
+      if(PHASE==="open") r += s.regOpen; else if(PHASE==="conditional") r += s.regCond; else r = s.regOver + r;
+      return r; });
+    add("late",sp.labels.late,["inperson","id","contact"],function(){ return s.late; },{strong:sp.strong.late||[]});
+    add("eligible",sp.labels.eligible,["register","status","contact"],function(){ return s.elig; },{strong:sp.strong.eligible||[],boost:4});
+    add("status",sp.labels.status,["register","mail","contact"],function(){ return s.status; },{strong:sp.strong.status||[]});
+    add("dates",sp.labels.dates,["mail","inperson","late"],function(){ return PHASE==="over" ? s.datesOver : s.dates; });
+    add("mail",sp.labels.mail,["noballot","inperson","dates"],function(){ return s.mail; });
+    add("noballot",sp.labels.noballot,["inperson","contact","status"],function(){ return (PHASE!=="over" ? s.nbOpen : s.nbOver) + s.nbTail; },{strong:sp.strong.noballot||[],boost:14});
+    add("inperson",sp.labels.inperson,["id","late","mail","contact"],function(){ return s.inperson; },{test:function(t){ return /\b\d{5}\b/.test(t); }});
+    add("id",sp.labels.id,["inperson","register","contact"],function(){ return s.id; },{strong:sp.strong.id||[],boost:3});
+    add("contact",sp.labels.contact,["register","status","mail"],function(){ return s.contact; });
+    add("thanks","",["register","dates","mail","inperson"],function(){ return s.thanks; });
+    add("hello","",["register","dates","mail","inperson","status","contact"],function(){ return s.greet; });
+    return P;
+  }
+
+  (function(){
+    var hot='<a href="tel:+18002328682">(800) 232-8682</a>';
+    var guide=A("https://voterguide.sos.ca.gov/","voterguide.sos.ca.gov");
+    var P={code:"es",name:"Español"};
+    P.ui={
+      title:"Ayudante del Votante de California",
+      sub:"Respuestas claras sobre cómo registrarse y votar.",
+      tag:"Sin iniciar sesión",
+      ph:"Pregunte sobre registro, fechas, boletas por correo…",
+      send:"Enviar",
+      label:"Escriba su pregunta",
+      footer:'Este es un ayudante independiente y no es un sitio oficial del gobierno. Confirme los detalles importantes con la <a href="https://www.sos.ca.gov/elections/" target="_blank" rel="noopener">Secretaría de Estado de California</a> o con la oficina electoral de su condado. Traducido con ayuda de IA.',
+      banner:{
+        open:"El día de la elección es el 3 de noviembre de 2026. Regístrese a más tardar el 19 de octubre.",
+        conditional:"El día de la elección es el 3 de noviembre de 2026. El registro el mismo día está abierto en los centros de votación.",
+        over:"La elección del 3 de noviembre de 2026 ya pasó. Las respuestas son generales. Consulte sos.ca.gov/elections para la próxima."
+      },
+      onlyEnglish:'<p>Esta respuesta solo está disponible en inglés por ahora. Para ayuda en español, llame al '+hot+'.</p>',
+      fallback:'<p>No estoy seguro de haber entendido. Intente con otras palabras, como “registro”, “boleta por correo”, “fecha límite” o “centro de votación”, o toque un tema abajo. Para hablar con una persona, llame al '+hot+' o a la oficina electoral de su condado.</p>'
+    };
+    P.topics={};
+    var X=P.topics;
+
+    X.greet={ next:["register","dates","mail","inperson","status","contact"], html:function(){
+      return '<p>¡Hola! Soy el Ayudante del Votante de California. Puedo explicarle cómo registrarse, las fechas límite, cómo votar por correo o en persona, y con quién comunicarse.</p><p>Toque una pregunta abajo o escriba la suya.</p>';
+    }};
+
+    X.register={ label:"¿Cómo me registro?", kw:["registr","rejistr","registar","inscrib","empadron","primera vez","nuevo votante","nueva votante","sacar mi registro"], next:["eligible","late","status","contact"], html:function(){
+      var s='<p>La forma más rápida es en línea en '+REG+'. En esa página, elija <strong>Register to Vote Now</strong> (Registrarse ahora). Toma unos minutos y está disponible en 10 idiomas.</p><p>Tenga a la mano lo siguiente.</p><ul><li>Su número de licencia de conducir o identificación de California, o los últimos cuatro dígitos de su número de Seguro Social</li><li>Su fecha de nacimiento</li></ul><p>¿No tiene computadora? Llame al '+hot+' o a la oficina electoral de su condado y pida que le envíen un formulario en papel por correo.</p>';
+      if(PHASE==="open") s+='<p><strong>La fecha límite para la elección del 3 de noviembre es el lunes 19 de octubre de 2026.</strong> Las solicitudes en línea deben enviarse a más tardar ese día, y las enviadas por correo deben tener matasellos de esa fecha o anterior.</p><p>Si no llega a tiempo, todavía puede registrarse y votar el mismo día (toque “Se me pasó la fecha límite”).</p>';
+      else if(PHASE==="conditional") s+='<p><strong>La fecha límite regular para la elección del 3 de noviembre fue el 19 de octubre.</strong> Todavía puede registrarse y votar el mismo día. Toque “Se me pasó la fecha límite” para ver cómo.</p>';
+      else s='<p>La elección del 3 de noviembre de 2026 ya pasó. En California, la fecha límite regular para registrarse es 15 días antes del día de la elección. Las fechas de la próxima elección están en '+SOS+'.</p>'+s;
+      return s;
+    }};
+
+    X.late={ label:"Se me pasó la fecha límite", kw:["muy tarde","ya paso la fecha","se paso la fecha","se me paso","perdi la fecha","mismo dia","misma fecha","condicional","despues de la fecha"], strong:["se me paso la fecha","ya paso la fecha","muy tarde","ya es tarde para reg","ya vencio","vencio el plazo","ya paso el plazo","se acabo el plazo"], next:["inperson","id","contact"], html:function(){
+      return '<p>Todavía puede participar. California ofrece el <strong>registro el mismo día</strong>, también llamado registro condicional de votante, para quienes no se registraron a tiempo.</p><ul><li>Está disponible hasta el día de la elección, incluido ese día.'+(PHASE!=="over"?' Para esta elección, del 20 de octubre al 3 de noviembre de 2026.':'')+'</li><li>Vaya a la oficina electoral de su condado o a un centro de votación, regístrese y vote con una boleta provisional en el mismo lugar.</li><li>Su boleta se cuenta cuando el condado confirma su registro.</li><li>Es posible que le pidan identificación, así que lleve su licencia de conducir, una identificación estatal u otro documento que muestre su nombre y dirección.</li></ul><p>Busque un lugar en '+CENTERS+'. El día de la elección, los centros de votación abren de 7 a. m. a 8 p. m.</p>';
+    }};
+
+    X.eligible={ label:"¿Puedo votar?", kw:["elegible","eligib","puedo votar","poder votar","calific","requisitos","ciudadan","delito","felon","antecedentes","libertad condicional","prision","residente","visa","inmigr","soy de otro pais"], strong:["green card","tarjeta verde","residente permanente","no soy ciudadan"], boost:4, next:["prereg","register","contact"], html:function(){
+      return '<p>Puede registrarse para votar en California si cumple con lo siguiente.</p><ul><li>Es ciudadano(a) de EE. UU. y residente de California</li><li>Tiene al menos 18 años el día de la elección</li><li>No está cumpliendo actualmente una condena en una prisión estatal o federal por un delito grave</li><li>Un tribunal no lo ha declarado mentalmente incapaz de votar</li></ul><p><strong>Importante.</strong> Tener una green card (residencia permanente) o una visa por sí sola no le da derecho a registrarse. Debe ser ciudadano(a) de EE. UU. Si se hizo ciudadano(a) por naturalización, puede registrarse como cualquier otro ciudadano. Registrarse sin ser elegible puede causar problemas graves, así que si tiene dudas, llame al '+hot+' antes de enviar cualquier solicitud.</p>';
+    }};
+
+    X.prereg={ label:"Tengo 16 o 17 años", kw:["16 anos","17 anos","tengo 16","tengo 17","pre reg","prereg","pre rej","pre-reg","menor de 18","adolescente"], boost:6, next:["eligible","register","contact"], html:function(){
+      return '<p>Puede <strong>preregistrarse</strong> a los 16 o 17 años si cumple con los demás requisitos. Solicítelo en '+REG+' y quedará registrado(a) automáticamente cuando cumpla 18 años.</p><p>El preregistro no cambia la edad para votar. Debe tener 18 años para emitir su voto.</p>';
+    }};
+
+    X.status={ label:"Revisar mi registro", kw:["estoy registrad","ya estoy registr","revisar mi registro","verificar","consultar mi registro","comprobar","estatus","estado de mi registro","partido politico","buscar mi registro","si estoy registr"], next:["register","mail","contact"], html:function(){
+      return '<p>Tres formas rápidas de revisarlo.</p><ul><li>En línea con la herramienta My Voter Status en '+STATUS+'</li><li>Envíe un mensaje de texto con la palabra <strong>VOTE</strong> al <strong>GOVOTE (468-683)</strong></li><li>Llame al '+hot+'</li></ul><p>También muestra su condado y su preferencia de partido político.</p>';
+    }};
+
+    X.dates={ label:"Fechas importantes", kw:["fecha","cuando","calendario","dia de la eleccion","que dia","dia es la eleccion","limite","plazo"], next:["mail","inperson","late"], html:function(){
+      if(PHASE==="over") return '<p>La elección del 3 de noviembre de 2026 ya pasó. Estas reglas se repiten en las elecciones de California.</p><ul><li>Regístrese al menos <strong>15 días antes</strong> del día de la elección. Después de eso, puede usar el registro el mismo día hasta el día de la elección.</li><li>Los condados empiezan a enviar una boleta por correo a todo votante activo unos 29 días antes de la elección.</li><li>Los centros de votación en persona abren unos 10 días antes, y más centros abren unos 3 días antes.</li><li>El último día para pedir una boleta de reemplazo por correo es 7 días antes del día de la elección.</li><li>El día de la elección, los lugares de votación abren de <strong>7 a. m. a 8 p. m.</strong></li><li>Las boletas por correo deben tener matasellos del día de la elección o antes y llegar dentro de 7 días.</li></ul><p>Las fechas exactas de la próxima elección están en '+SOS+'.</p>';
+      return '<p>Fechas importantes de la <strong>Elección General del 3 de noviembre de 2026</strong>.</p><ul><li><strong>5 de octubre</strong> Los condados comienzan a enviar las boletas por correo</li><li><strong>6 de octubre</strong> Abren los buzones seguros para boletas</li><li><strong>19 de octubre</strong> Último día para registrarse en la fecha límite regular</li><li><strong>20 de octubre al 3 de noviembre</strong> Registro el mismo día en oficinas del condado y centros de votación</li><li><strong>24 de octubre</strong> Abren los primeros centros de votación en los condados que usan ese modelo</li><li><strong>31 de octubre</strong> Abren los demás centros de votación en persona</li><li><strong>3 de noviembre</strong> Día de la elección. Abren de 7 a. m. a 8 p. m.</li></ul><p>Las boletas por correo deben tener matasellos del 3 de noviembre o antes y llegar dentro de 7 días. El calendario completo está en '+SOS+'.</p>';
+    }};
+
+    X.mail={ label:"Votar por correo", kw:["correo","boleta","papeleta","enviar mi voto","devolver","buzon","estampilla","sello","matasello","depositar","entregar mi boleta","dejar mi boleta","pedir mi boleta","solicitar","como pido","voto por correo"], next:["noballot","track","inperson","dates"], html:function(){
+      return '<p>California envía una boleta por correo a todo votante activo registrado antes de cada elección, así que no necesita pedirla.</p><p>Puede devolverla de cualquiera de estas formas.</p><ul><li><strong>Por correo.</strong> El franqueo ya está pagado. Debe tener matasellos del día de la elección o antes y llegar a su condado dentro de 7 días.</li><li><strong>En un buzón.</strong> Los buzones seguros para boletas ya están abiertos.</li><li><strong>En persona.</strong> En la oficina electoral de su condado, en un centro de votación o en un lugar de votación a más tardar a las 8 p. m. del día de la elección.</li></ul><p>Firme el sobre de su boleta para que se pueda contar. Si falta poco para la elección, un buzón o un centro de votación es la opción más segura.</p>';
+    }};
+
+    X.noballot={ label:"No me llegó mi boleta", kw:["no me lleg","no lleg","nunca lleg","no recibi","no he recibido","todavia no","todabia","aun no","perdi mi boleta","se me perdio","derram","manch","rompi","danad","arruin","reemplazo","remplazo","otra boleta","nueva boleta","boleta nueva","por que no me","porque no me","x q ","fuera del estado","fuera de california","otro estado","no estoy en california"], strong:["no me lleg","nunca lleg","no he recibido","no recibi","derram","manch","otra boleta","nueva boleta","reemplazo","perdi mi boleta"], boost:14, next:["inperson","contact","status"], html:function(){
+      var a;
+      if(PHASE!=="over") a='<p><strong>Ya es tarde para pedir que le envíen una boleta de reemplazo por correo para esta elección.</strong> El último día para pedirla fue el 27 de octubre. <strong>Todavía puede votar en persona.</strong> Vaya a la oficina electoral de su condado o a cualquier centro de votación y allí le darán una boleta para votar. El 3 de noviembre abren de 7 a. m. a 8 p. m., y si está en la fila a las 8 p. m., todavía puede votar.</p>';
+      else a='<p>Si su boleta se perdió, se dañó o no le llegó, comuníquese cuanto antes con la oficina electoral de su condado y pida una de reemplazo. Se puede pedir por correo hasta 7 días antes del día de la elección. Después de eso, aún puede votar en persona en la oficina electoral de su condado o en un centro de votación y recibir allí una boleta.</p>';
+      return a+'<p>Esto es lo que más conviene saber.</p><ul><li>Una boleta dañada o manchada es lo mismo que una boleta perdida.</li><li>Si no le ha llegado, las razones más comunes son que su dirección registrada está desactualizada (las boletas no se reenvían), que se registró después de la fecha límite o que su registro no está activo. Revíselo en '+STATUS+'.</li><li>Si está fuera de California, llame a la oficina electoral de su condado o al '+hot+' y pregunte si pueden enviarle la boleta a donde está. Las boletas por correo cuentan si tienen matasellos del día de la elección o antes y llegan dentro de 7 días.</li><li>Encuentre el centro de votación más cercano en '+CENTERS+'.</li></ul><p>¿No sabe a qué condado llamar? Llame al '+hot+' y le indicarán.</p>';
+    }};
+
+    X.inperson={ label:"Votar en persona", kw:["en persona","centro de votacion","lugar de votacion","lugar pa votar","lugar para votar","casilla","donde voto","donde votar","donde esta el lugar","mas cerca","serca","cerca de mi","donde puedo votar","donde puedo ir a votar","donde queda","cerca de mi casa","a que hora","a q ora","horario","abren","abierto","votacion temprana","codigo postal"], strong:["donde puedo votar","donde puedo ir a votar"], test:function(t){ return /\b\d{5}\b/.test(t) && /lugar|donde|dónde|cerca|serca|casilla|centro|buzon|buzón|sitio|votar/i.test(t); }, next:["id","late","mail","contact"], html:function(){
+      return '<p>Puede votar en persona aunque haya recibido una boleta por correo. No puedo buscar lugares por código postal, pero puede encontrar el centro de votación, buzón o lugar de votación más cercano en '+CENTERS+'. Escriba allí su dirección completa o elija su condado.</p><ul><li>Antes del día de la elección, los centros de votación suelen abrir todos los días de 10 a. m. a 7 p. m. Las fechas y horarios varían un poco según el condado.</li><li>El día de la elección abren de <strong>7 a. m. a 8 p. m.</strong></li><li>Si está en la fila a las 8 p. m., todavía puede votar.</li></ul><p>Lleve su boleta por correo si la tiene, o diga al personal que quiere votar allí. Si ya tiene su boleta lista, también puede dejarla en cualquier buzón seguro o centro de votación en vez de enviarla por correo.</p>';
+    }};
+
+    X.id={ label:"¿Necesito identificación?", kw:["identificacion","identif"," id ","pasaporte","licencia","documento","mi id","sin id"], strong:["perdi mi id","perdi mi licencia","sin id","no tengo id","no tengo identificacion","no tengo pasaporte","sin pasaporte","sin identificacion"], boost:3, next:["inperson","register","contact"], html:function(){
+      return '<p>La mayoría de los votantes de California <strong>no necesita mostrar identificación</strong> para votar. Haber perdido su ID o no tener pasaporte tampoco suele ser un problema.</p><ul><li>Si ya votó antes en California, no necesita identificación.</li><li>Si se registró con el número de su licencia de conducir o identificación de California, o con los últimos cuatro dígitos de su Seguro Social, no deberían pedírsela.</li><li>La excepción principal es una persona que vota por primera vez, se registró por correo y no dio ninguno de esos números. Si se la piden, sirve cualquier documento que muestre su nombre y dirección. No tiene que ser una identificación con foto ni un pasaporte.</li></ul><p>Si va a usar el registro el mismo día, pregunte a la oficina electoral de su condado qué necesitará. También puede llamar al '+hot+' antes de ir. Si perdió su identificación, igual puede ir a un centro de votación y explicar su situación al personal.</p>';
+    }};
+
+    X.contact={ label:"Hablar con una persona", kw:["persona real","humano","hablar con","llamar","llamada","telefono","numero","correo electronico","oficina","condado","ayuda","linea","cerrada","cerrado","trabajo hasta","nadie contesta","nadie me ayuda"], next:["register","status","mail"], html:function(){
+      return '<p>Estoy disponible las 24 horas, pero si necesita hablar con una persona, aquí le indico con quién comunicarse.</p><ul><li><strong>Línea para votantes de la Secretaría de Estado</strong> '+hot+'</li><li><strong>Correo electrónico</strong> <a href="mailto:elections@sos.ca.gov">elections@sos.ca.gov</a></li><li><strong>La oficina electoral de su condado</strong> Ahí se guarda su registro de votante y suele ser la vía más rápida para preguntas locales. Busque la suya en '+SOS+'.</li></ul><p>Si la línea está cerrada cuando usted puede llamar, puede escribir por correo electrónico, usar este ayudante a cualquier hora o enviar la palabra <strong>VOTE</strong> al <strong>GOVOTE (468-683)</strong> para revisar su registro. Para algo urgente, los centros de votación tienen personal el día de la elección de 7 a. m. a 8 p. m.</p>';
+    }};
+
+    X.transit={ label:"Cómo llegar a votar", kw:["transporte","autobus","camion","tren","metro","gratis","gratuito","sin carro","no tengo carro","no tengo coche","como llegar","pasaje","viaje gratis"], boost:4, next:["inperson","mail","contact"], html:function(){
+      if(PHASE==="over") return '<p>En California no hay un programa estatal de transporte gratis. Cada agencia de transporte decide, y muchas ofrecen viajes gratis o con descuento el día de la elección en algunos años. Revise el sitio web o las redes sociales de su agencia local cuando se acerque una elección.</p><p>Tal vez ni necesite un viaje, porque puede dejar su boleta por correo en un buzón cercano. Busque ubicaciones en '+CENTERS+' cuando haya una elección próxima.</p>';
+      return '<p>En California no hay un programa estatal de transporte gratis. Cada agencia de transporte decide, así que revise la suya.</p><p>Agencias que encontré con viajes gratis el día de la elección, 3 de noviembre de 2026.</p><ul><li><strong>LA Metro</strong> todos los autobuses y trenes, además de Metro Micro y Metro Bike Share</li><li><strong>North County Transit District (condado de San Diego)</strong> COASTER, SPRINTER, BREEZE y más. No incluye el MTS de San Diego.</li><li><strong>Marin Transit</strong> autobuses locales</li><li><strong>Big Blue Bus (Santa Mónica)</strong> todo el sistema</li></ul><p>Otras agencias podrían ofrecerlo también, así que visite el sitio web de su agencia local. Tal vez ni necesite un viaje, porque puede dejar su boleta en un buzón cercano. Busque ubicaciones en '+CENTERS+'.</p>';
+    }};
+
+    X.opinion={ kw:["por quien","x quien","a quien voto","quien debo","candidato","recomiend","por cual"], boost:6, next:["register","dates","mail","inperson"], html:function(){
+      return '<p>No puedo decirle por quién ni por qué votar. Esa decisión es suya. Puedo ayudarle con el registro, con su boleta y con encontrar dónde votar.</p><p>Para información no partidista sobre lo que aparece en su boleta, puede consultar estos recursos.</p><ul><li>La Guía Oficial de Información para el Votante en '+guide+'</li><li>Vote411 de la Liga de Mujeres Votantes en '+A("https://www.vote411.org/","vote411.org")+'</li><li>La guía de la Fundación de Votantes de California en '+A("https://calvoter.org/","calvoter.org")+'</li></ul>';
+    }};
+
+    X.thirdparty={ kw:["mi hermana","mi hermano","mi hija","mi hijo","mi esposo","mi esposa","mi mama","mi papa","alguien mas","yeno","lleno mi boleta","llenaron","firmo por mi"], strong:["mi hermana","mi hermano","mi hija","mi hijo","mi esposo","mi esposa","yeno mi","lleno mi boleta","llenaron mi"], boost:15, next:["noballot","track","contact"], html:function(){
+      return '<p>La boleta debe ser marcada y firmada por la persona a quien pertenece. Así funciona.</p><ul><li><strong>Si otra persona llenó y envió su boleta.</strong> Llame de inmediato a la oficina electoral de su condado, explique lo que pasó y pregunte qué opciones tiene. Si cree que se usó indebidamente su información de votante, puede reportarlo al '+hot+'.</li><li><strong>Si quiere enviar una boleta a un familiar.</strong> La boleta se envía a la dirección que figura en el registro de esa persona. Si vive en otro estado, debe comunicarse con la oficina electoral de su condado para que se la envíen allá. Esa persona debe llenarla y firmarla ella misma. California permite que un votante autorice a otra persona a entregar su boleta ya completada, pero confirme los detalles con el condado.</li></ul><p>No puedo dar asesoría legal. El condado puede decirle qué aplica a su situación.</p>';
+    }};
+
+    X.track={ label:"Seguir mi boleta", kw:["ya conto","se conto","si llego mi boleta","fue recibida","rastrear","seguimiento","donde esta mi boleta","contaron mi voto","cuenta mi boleta","conto mi boleta"], boost:8, next:["mail","status","contact"], html:function(){
+      return '<p>Puede inscribirse en <strong>Where’s My Ballot?</strong> (¿Dónde está mi boleta?) para recibir avisos cuando su boleta sea enviada, recibida y contada. Empiece en '+A("https://california.ballottrax.net/voter/","california.ballottrax.net/voter")+'.</p><p>También puede revisar su registro en '+STATUS+'.</p>';
+    }};
+
+    X.votematters={ kw:["mi voto cuenta","mi voto sirve","mi voto importa","sirve mi voto","vale mi voto","estado azul","estado asul","estado rojo","vale la pena votar","para que votar","pa q votar","cuenta mi voto"], boost:8, next:["register","dates","mail","inperson"], html:function(){
+      return '<p>Cada boleta válida se cuenta, y todas valen lo mismo sin importar dónde viva usted.</p><p>Además, los californianos deciden contiendas que se resuelven dentro del estado, como gobernador, la legislatura estatal, los escaños de la Cámara de Representantes de EE. UU., cargos locales y proposiciones, según la elección. Algunas de esas contiendas pueden ser muy reñidas. No puedo predecir resultados. Para saber qué está en juego en su boleta, consulte la Guía de Información para el Votante en '+guide+'.</p>';
+    }};
+
+    X.thanks={ kw:["gracias","muchas gracias","grax"], next:["register","dates","mail","inperson"], html:function(){ return '<p>De nada. ¿Puedo ayudarle con algo más?</p>'; }};
+    X.hello={ kw:["hola","buenas","buenos dias","buenas tardes"], next:["register","dates","mail","inperson","status","contact"], html:function(){ return X.greet.html(); }};
+
+    X.otherstate={ kw:["vivo en florida","bivo en florida","florida","texas","nueva york","vivo en otro estado","bivo en otro estado","ahora vivo en","ahora bivo en","ya no vivo en california","me mude a","me fui a vivir","residente de otro estado","no soy residente"], strong:["ahora vivo en","ahora bivo en","ya no vivo en california","vivo en otro estado","bivo en otro estado","me mude a otro estado"], boost:9, next:["eligible","moved","contact"], html:function(){
+      return '<p>Solo puede votar en California si vive aquí. Si ahora es residente de otro estado, se registra y vota en ese estado, con sus propias reglas y fechas límite. Yo solo puedo ayudar con California.</p><p>Encuentre la información de registro y votación de su estado en '+A("https://vote.gov/","vote.gov")+' o comuníquese con la oficina electoral de su nuevo estado. Si todavía tiene una dirección en California a la que va a regresar, con gusto le ayudo con eso.</p>';
+    }};
+
+    X.moved={ label:"Me mudé o cambié mi nombre", kw:["me mude","cambie de direccion","nueva direccion","cambio de direccion","cambiar mi direccion","cambiar mi nombre","cambie mi nombre","cambio de nombre","me case","preferencia de partido","actualizar mi registro","volver a registr","cambiar de partido","mi direccion"], boost:2, next:["late","status","contact"], html:function(){
+      return '<p>Necesita <strong>volver a registrarse</strong> si se mudó, cambió de nombre o quiere cambiar su preferencia de partido político.</p><p>Actualícelo en línea en '+REG+'. Las boletas no se reenvían por correo, así que una dirección vieja puede significar una boleta que nunca le llega.</p><p>Si ya pasó la fecha límite, puede arreglarlo en persona con el registro el mismo día en la oficina electoral de su condado o en un centro de votación.</p>';
+    }};
+
+    X.guide={ label:"¿Qué hay en mi boleta?", kw:["en mi boleta","proposicion","propuesta","medidas","guia del votante","guia oficial","candidatos","que hay en la eleccion","de que trata la eleccion","gobernador","quien se postula","quienes se postulan"], next:["inperson","mail","contact"], html:function(){
+      if(PHASE==="over") return '<p>La elección del 3 de noviembre de 2026 ya pasó. Para la próxima, la Guía Oficial de Información para el Votante en '+guide+' explica las contiendas y medidas estatales cuando se publica, y la oficina electoral de su condado puede informarle sobre las contiendas locales. No puedo ver su boleta personal ni recomendar candidatos o medidas.</p>';
+      return '<p>La Elección General del 3 de noviembre de 2026 incluye cargos estatales como gobernador y secretario de estado, todos los escaños de la Cámara de Representantes de EE. UU., la legislatura estatal y proposiciones, además de contiendas locales que dependen de dónde viva.</p><p>La Guía Oficial de Información para el Votante explica las contiendas y medidas estatales. Léala en '+guide+'. No puedo ver su boleta personal ni las contiendas locales, así que la oficina electoral de su condado es el lugar para preguntar por ellas.</p><p>No puedo recomendar candidatos ni medidas, pero con gusto le ayudo con cómo y dónde votar.</p>';
+    }};
+
+    X.results={ label:"Resultados", kw:["resultados","quien gano","quien va ganando","ganador","conteo","contando"], next:["track","contact"], html:function(){
+      return '<p>Los resultados estatales se publican después de que cierran los centros a las 8 p. m. del día de la elección en '+A("https://electionresults.sos.ca.gov/","electionresults.sos.ca.gov")+'. El conteo continúa varios días después, conforme llegan las boletas por correo.</p>';
+    }};
+
+    I18N.es=P;
+  })();
+
+  I18N.zh = buildSimple("zh","中文","(800) 339-2857","+18003392857",{
+    ui:{ title:"加州选民助手", sub:"关于登记和投票的简明解答。", tag:"无需登录", ph:"询问登记、截止日期、邮寄选票…", send:"发送", label:"输入您的问题",
+      footer:'这是独立的辅助工具，并非政府官方网站。重要事项请向<a href="https://www.sos.ca.gov/elections/" target="_blank" rel="noopener">加州州务卿办公室</a>或您所在县的选举办公室确认。本页由 AI 协助翻译。',
+      banner:{ open:"选举日为 2026 年 11 月 3 日。请在 10 月 19 日前登记。", conditional:"选举日为 2026 年 11 月 3 日。投票中心现可办理当天登记。", over:"2026 年 11 月 3 日的选举已结束，以下为一般性说明。下次选举请查看 sos.ca.gov/elections。" } },
+    fallback:'<p>我不太确定您的意思。请换个说法，例如“登记”“邮寄选票”“截止日期”“投票中心”，或点选下方主题。如需与真人交谈，请拨打中文专线 {HOT}，或联系您所在县的选举办公室。</p>',
+    onlyEnglish:'<p>这个回答目前只有英文版。如需中文协助，请拨打 {HOT}。</p>',
+    labels:{ register:"如何登记？", late:"错过了截止日期", eligible:"我有资格吗？", status:"查询我的登记", dates:"重要日期", mail:"邮寄投票", noballot:"我没收到选票", inperson:"亲自投票", id:"需要证件吗？", contact:"联系真人" },
+    strong:{ late:["错过","錯過","来不及","來不及"], eligible:["绿卡","綠卡","永久居民"], noballot:["没收到","沒收到","没有收到","沒有收到","没寄到","弄丢","丢了选票","丟了選票","弄脏","弄髒"], id:["没有证件","沒有證件","丢了证件","弄丢证件","没有护照","沒有護照"] },
+    kw:{
+      register:["注册","登记","註冊","登記","怎么登","怎麼登","第一次投票","首次投票"],
+      late:["截止","来不及","太晚","已经过了","已經過了","当天登记","當天登記","当天注册","临时登记","臨時登記"],
+      eligible:["资格","資格","能投票","可以投票","能不能投票","公民","绿卡","綠卡","移民","重罪","合格","签证","簽證","永久居民"],
+      status:["查询","查詢","是否登记","已登记","已登記","确认登记","查看登记","登記狀態","登记状态"],
+      dates:["日期","什么时候","何时","幾時","几时","截止日","选举日","選舉日","时间表","時間表","哪一天"],
+      mail:["邮寄","郵寄","邮件","投票箱","寄回","选票","選票","投票卡","邮寄投票"],
+      noballot:["没收到","沒收到","没有收到","沒有收到","没寄到","弄丢","丢了","丟了","洒","弄脏","弄髒","损坏","損壞","补发","補發","重新寄","换一张","換一張","新选票","新選票","国外","海外","别的州","其他州","外州"],
+      inperson:["亲自","親自","投票中心","投票站","在哪里投","哪裡投","哪里投","几点","幾點","附近","最近的","开放","開放","邮政编码","郵遞區號"],
+      id:["证件","證件","身份证","身份證","护照","護照","驾照","駕照"],
+      contact:["电话","電話","联系","聯絡","联络","真人","客服","热线","熱線","打电话","打電話","号码","號碼","不在办公","下班"],
+      hello:["你好","您好","嗨","哈喽","哈囉"], thanks:["谢谢","謝謝","多谢","多謝"]
+    },
+    s:{
+      greet:'<p>您好！我是加州选民助手。我可以说明如何登记、重要的截止日期、如何邮寄或亲自投票，以及可以联系谁。</p><p>请点选下方问题，或直接输入您的问题。</p>',
+      reg:'<p>最快的方式是在线登记，网址是 {REG}。请选择 <strong>Register to Vote Now</strong>（立即登记）。只需几分钟，网站提供 10 种语言。</p><p>请准备好以下资料。</p><ul><li>加州驾照或加州身份证号码，或社会安全号码的后四位</li><li>出生日期</li></ul><p>没有电脑？请拨打 {HOT} 或联系您所在县的选举办公室，索取纸质表格邮寄给您。</p>',
+      regOpen:'<p><strong>2026 年 11 月 3 日选举的登记截止日期是 10 月 19 日（星期一）。</strong>在线申请须在当天提交，邮寄的表格邮戳须为当天或更早。</p><p>如果来不及，仍可在当天登记并投票（请点选“错过了截止日期”）。</p>',
+      regCond:'<p><strong>11 月 3 日选举的正常登记截止日期（10 月 19 日）已过。</strong>您仍可在当天登记并投票，请点选“错过了截止日期”了解方法。</p>',
+      regOver:'<p>2026 年 11 月 3 日的选举已经结束。加州的正常登记截止日期是选举日前 15 天。下次选举的日期请见 {SOS}。</p>',
+      late:'<p>您仍然可以投票。加州提供<strong>当天登记</strong>（也称有条件登记），适用于没有及时登记的人。</p><ul><li>可在选举日之前及选举日当天办理。</li><li>请前往您所在县的选举办公室或任何投票中心，登记后当场用临时选票投票。</li><li>县选举办公室确认您的登记资格后，您的选票就会被计票。</li><li>可能会要求出示证件，请带上驾照或其他显示您姓名和地址的文件。</li></ul><p>请在 {CENTERS} 查找地点。选举日当天，投票中心开放时间为上午 7 点至晚上 8 点。</p>',
+      elig:'<p>符合以下条件即可在加州登记投票。</p><ul><li>您是美国公民，并且是加州居民</li><li>在选举日当天年满 18 岁</li><li>目前没有因重罪在州立或联邦监狱服刑</li><li>没有被法院裁定为无行为能力投票</li></ul><p><strong>重要。</strong>仅持有绿卡（永久居民）或签证<strong>不能</strong>登记投票，必须是美国公民。入籍后成为公民者可以像其他公民一样登记。如果不是公民却登记，可能带来严重后果，所以有疑问请先拨打 {HOT}。</p><p>16 或 17 岁的人可以先预先登记，年满 18 岁时自动生效。请到 {REG} 办理。</p>',
+      status:'<p>有三种快速的查询方式。</p><ul><li>在线使用 My Voter Status 工具，网址是 {STATUS}</li><li>发送短信，内容为 <strong>VOTE</strong>，号码是 <strong>GOVOTE（468-683）</strong></li><li>拨打 {HOT}</li></ul><p>这里也会显示您所属的县和政党偏好。</p>',
+      dates:'<p><strong>2026 年 11 月 3 日大选</strong>的重要日期。</p><ul><li><strong>10 月 5 日</strong> 各县开始寄出邮寄选票</li><li><strong>10 月 6 日</strong> 安全投票箱开放</li><li><strong>10 月 19 日</strong> 正常登记截止日</li><li><strong>10 月 20 日至 11 月 3 日</strong> 可在县选举办公室和投票中心当天登记</li><li><strong>10 月 24 日</strong> 部分县的投票中心开放</li><li><strong>10 月 31 日</strong> 其余投票中心开放</li><li><strong>11 月 3 日</strong> 选举日，上午 7 点至晚上 8 点</li></ul><p>邮寄选票的邮戳须为 11 月 3 日或更早，并在 7 天内送达。完整日历见 {SOS}。</p>',
+      datesOver:'<p>2026 年 11 月 3 日的选举已经结束。加州每次选举的规则大致如下。</p><ul><li>至少在选举日前 <strong>15 天</strong>登记，之后可用当天登记。</li><li>各县约在选举前 29 天开始向所有活跃选民寄出邮寄选票。</li><li>投票中心约在选举前 10 天开放，约 3 天前开放更多。</li><li>要求寄送替换选票的截止日是选举日前 7 天。</li><li>选举日当天投票时间为<strong>上午 7 点至晚上 8 点</strong>。</li><li>邮寄选票的邮戳须为选举日或更早，并在 7 天内送达。</li></ul><p>下次选举的确切日期见 {SOS}。</p>',
+      mail:'<p>加州会在每次选举前向所有登记的活跃选民寄出邮寄选票，您无需申请。</p><p>您可以用以下任一方式交回。</p><ul><li><strong>邮寄。</strong>邮资已付。邮戳须为选举日或更早，并在 7 天内送达您所在的县。</li><li><strong>投入投票箱。</strong>安全选票投票箱已经开放。</li><li><strong>亲自交回。</strong>可在选举日晚上 8 点前交到县选举办公室、投票中心或投票站。</li></ul><p>请务必在选票信封上签名，否则无法计票。离选举日很近时，投票箱或投票中心最保险。</p>',
+      nbOpen:'<p><strong>这次选举已经来不及申请邮寄替换选票了。</strong>最后申请日是 10 月 27 日。<strong>但您仍可亲自投票。</strong>请前往县选举办公室或任何投票中心，现场领取选票投票。11 月 3 日开放时间为上午 7 点至晚上 8 点，晚上 8 点前排在队伍中的人仍可投票。</p>',
+      nbOver:'<p>如果选票遗失、损坏或没收到，请尽快联系县选举办公室申请替换。可在选举日前 7 天之前申请邮寄。之后仍可亲自到县选举办公室或投票中心领票投票。</p>',
+      nbTail:'<ul><li>弄脏或损坏的选票和遗失的选票一样处理。</li><li>没收到的常见原因包括登记地址已过时（选票不会转寄）、登记晚于截止日，或登记状态不是“活跃”。请在 {STATUS} 查看。</li><li>如果您人在加州以外，请打电话给县选举办公室或 {HOT}，询问能否寄到您目前的地址。邮戳为选举日或更早，并在 7 天内送达的选票有效。</li><li>最近的投票中心见 {CENTERS}。</li></ul>',
+      inperson:'<p>即使收到了邮寄选票，您也可以亲自投票。我无法按邮政编码查找地点，但您可以在 {CENTERS} 输入完整地址或选择所在的县，查找最近的投票中心、投票箱或投票站。</p><ul><li>选举日之前，投票中心通常每天上午 10 点至晚上 7 点开放，各县略有不同。</li><li>选举日当天开放时间为<strong>上午 7 点至晚上 8 点</strong>。</li><li>晚上 8 点前排在队伍中的人仍可投票。</li></ul><p>如果有邮寄选票，请带上它，或告诉工作人员您要在现场投票。选票已填好的话，也可以放进任何安全投票箱或投票中心，不必邮寄。</p>',
+      id:'<p>大多数加州选民<strong>不需要出示证件</strong>就能投票。证件遗失或没有护照通常也没有关系。</p><ul><li>如果您曾在加州投过票，就不需要证件。</li><li>如果您登记时提供了加州驾照或身份证号码，或社会安全号码后四位，通常不会被要求出示证件。</li><li>主要的例外是首次投票、通过邮寄登记、且没有提供上述号码的人。如被要求，任何显示您姓名和地址的文件都可以，不必是带照片的证件，也不必是护照。</li></ul><p>如果要用当天登记，请向县选举办公室确认需要带什么。也可以先拨打 {HOT}。证件遗失的人仍可前往投票中心向工作人员说明情况。</p>',
+      contact:'<p>我全天候都在，但如果您想与真人交谈，可以联系以下单位。</p><ul><li><strong>州务卿选民专线（中文）</strong> {HOT}</li><li><strong>电子邮件</strong> <a href="mailto:elections@sos.ca.gov">elections@sos.ca.gov</a></li><li><strong>您所在县的选举办公室</strong> 您的选民登记保存在那里，处理本地问题通常最快。请在 {SOS} 查找。</li></ul><p>如果您能打电话时专线已下班，可以发送电子邮件、随时使用本助手，或发送短信 <strong>VOTE</strong> 到 <strong>GOVOTE（468-683）</strong> 查询登记状态。</p>',
+      thanks:'<p>不客气。还有什么可以帮您的吗？</p>'
+    }
+  });
+
+  I18N.vi = buildSimple("vi","Tiếng Việt","(800) 339-8163","+18003398163",{
+    ui:{ title:"Trợ lý Cử tri California", sub:"Giải đáp rõ ràng về đăng ký và bỏ phiếu.", tag:"Không cần đăng nhập", ph:"Hỏi về đăng ký, ngày hạn chót, lá phiếu gửi thư…", send:"Gửi", label:"Nhập câu hỏi của quý vị",
+      footer:'Đây là công cụ hỗ trợ độc lập, không phải trang web chính thức của chính phủ. Xin xác nhận các chi tiết quan trọng với <a href="https://www.sos.ca.gov/elections/" target="_blank" rel="noopener">Bộ trưởng Ngoại vụ California</a> hoặc văn phòng bầu cử quận của quý vị. Bản dịch có sự hỗ trợ của AI.',
+      banner:{ open:"Ngày bầu cử là 3 tháng 11 năm 2026. Hãy đăng ký trước ngày 19 tháng 10.", conditional:"Ngày bầu cử là 3 tháng 11 năm 2026. Hiện có thể đăng ký ngay trong ngày tại các trung tâm bỏ phiếu.", over:"Cuộc bầu cử ngày 3 tháng 11 năm 2026 đã kết thúc. Các câu trả lời mang tính tổng quát. Xem sos.ca.gov/elections cho kỳ bầu cử tới." } },
+    fallback:'<p>Tôi chưa chắc đã hiểu ý quý vị. Xin thử diễn đạt khác, ví dụ “đăng ký”, “lá phiếu gửi thư”, “hạn chót”, “trung tâm bỏ phiếu”, hoặc chọn một chủ đề bên dưới. Để nói chuyện với người thật, xin gọi {HOT} (tiếng Việt) hoặc văn phòng bầu cử quận của quý vị.</p>',
+    onlyEnglish:'<p>Câu trả lời này hiện chỉ có bằng tiếng Anh. Để được giúp bằng tiếng Việt, xin gọi {HOT}.</p>',
+    labels:{ register:"Đăng ký thế nào?", late:"Tôi lỡ hạn chót", eligible:"Tôi có đủ điều kiện không?", status:"Kiểm tra đăng ký", dates:"Các ngày quan trọng", mail:"Bỏ phiếu qua thư", noballot:"Tôi chưa nhận được phiếu", inperson:"Bỏ phiếu trực tiếp", id:"Có cần giấy tờ tùy thân?", contact:"Nói chuyện với người thật" },
+    strong:{ late:["lo han","lỡ hạn","lỡ han","qua han","quá hạn","het han","hết hạn"], eligible:["the xanh","thẻ xanh","green card"], noballot:["chua nhan","chưa nhận","khong nhan","không nhận","mat phieu","mất phiếu","do len","đổ lên","phieu thay the","phiếu thay thế"], id:["khong co giay to","không có giấy tờ","mat giay to","mất giấy tờ","khong co ho chieu"] },
+    kw:{
+      register:["dang ky","đăng ký","ghi danh","lan dau bo phieu","lần đầu bỏ phiếu"],
+      late:["tre han","trễ hạn","muon qua","cung ngay","trong ngay","dang ky tam thoi","có điều kiện","co dieu kien"],
+      eligible:["du dieu kien","đủ điều kiện","co the bo phieu","cong dan","công dân","di tru","di trú","tien an","tiền án","visa","tu toi","tù tội"],
+      status:["kiem tra","kiểm tra","da dang ky chua","tinh trang","tình trạng","xem lai dang ky","toi co dang ky"],
+      dates:["ngay quan trong","ngày bầu cử","ngay bau cu","khi nao","khi nào","han chot","hạn chót","lich","lịch","bao gio","bao giờ"],
+      mail:["qua thu","qua thư","gui phieu","gửi phiếu","hop tha","hộp thả","gui lai","gửi lại","phieu bau","tem","buu dien","bưu điện"],
+      noballot:["khong nhan","chua nhan","chua thay","khong thay","mat phieu","lam mat","làm mất","bi do","bị đổ","bi hong","bị hỏng","bi rach","phieu thay the","phieu moi","phiếu mới","xin phieu khac","ngoai tieu bang","ngoài tiểu bang","o nuoc ngoai","chua toi"],
+      inperson:["truc tiep","trực tiếp","trung tam bo phieu","trung tâm bỏ phiếu","diem bo phieu","điểm bỏ phiếu","o dau","ở đâu","gan nha","gần nhà","may gio","mấy giờ","mo cua","mở cửa","gan nhat","gần nhất","ma zip"],
+      id:["giay to","giấy tờ","chung minh","chứng minh","bang lai","bằng lái","ho chieu","hộ chiếu"," id "],
+      contact:["dien thoai","điện thoại","goi cho","gọi cho","lien lac","liên lạc","nguoi that","người thật","tong dai","tổng đài","so dien thoai","gap nguoi","nhan vien","nhân viên","dong cua","đóng cửa"],
+      hello:["xin chao","xin chào","chao ban","chào bạn"], thanks:["cam on","cảm ơn","cám ơn"]
+    },
+    s:{
+      greet:'<p>Xin chào! Tôi là Trợ lý Cử tri California. Tôi có thể giải thích cách đăng ký, các hạn chót, cách bỏ phiếu qua thư hoặc trực tiếp, và nên liên lạc với ai.</p><p>Xin chọn một câu hỏi bên dưới hoặc tự nhập câu hỏi của quý vị.</p>',
+      reg:'<p>Cách nhanh nhất là đăng ký trực tuyến tại {REG}. Xin chọn <strong>Register to Vote Now</strong> (Đăng ký ngay). Chỉ mất vài phút và trang web có 10 ngôn ngữ.</p><p>Xin chuẩn bị sẵn các thông tin sau.</p><ul><li>Số bằng lái xe hoặc thẻ căn cước California, hoặc 4 số cuối của số An Sinh Xã Hội</li><li>Ngày sinh</li></ul><p>Không có máy tính? Xin gọi {HOT} hoặc văn phòng bầu cử quận để nhờ gửi mẫu giấy qua thư.</p>',
+      regOpen:'<p><strong>Hạn chót đăng ký cho cuộc bầu cử ngày 3 tháng 11 là Thứ Hai, 19 tháng 10 năm 2026.</strong> Đơn trực tuyến phải nộp trong ngày đó, còn đơn gửi thư phải có dấu bưu điện ngày đó hoặc sớm hơn.</p><p>Nếu quá hạn, quý vị vẫn có thể đăng ký và bỏ phiếu ngay trong ngày (xin chọn “Tôi lỡ hạn chót”).</p>',
+      regCond:'<p><strong>Hạn chót đăng ký thông thường cho cuộc bầu cử ngày 3 tháng 11 (19 tháng 10) đã qua.</strong> Quý vị vẫn có thể đăng ký và bỏ phiếu ngay trong ngày. Xin chọn “Tôi lỡ hạn chót” để xem cách thực hiện.</p>',
+      regOver:'<p>Cuộc bầu cử ngày 3 tháng 11 năm 2026 đã kết thúc. Tại California, hạn chót đăng ký thông thường là 15 ngày trước ngày bầu cử. Ngày của kỳ bầu cử tới có tại {SOS}.</p>',
+      late:'<p>Quý vị vẫn có thể tham gia. California có <strong>đăng ký ngay trong ngày</strong>, còn gọi là đăng ký có điều kiện, dành cho người chưa đăng ký kịp.</p><ul><li>Có thể thực hiện đến hết ngày bầu cử.</li><li>Đến văn phòng bầu cử quận hoặc bất kỳ trung tâm bỏ phiếu nào, đăng ký rồi bỏ phiếu bằng lá phiếu tạm thời ngay tại đó.</li><li>Lá phiếu được kiểm khi quận xác nhận việc đăng ký của quý vị.</li><li>Có thể được yêu cầu giấy tờ, nên hãy mang theo bằng lái hoặc giấy tờ khác có tên và địa chỉ.</li></ul><p>Tìm địa điểm tại {CENTERS}. Vào ngày bầu cử, các trung tâm mở cửa từ 7 giờ sáng đến 8 giờ tối.</p>',
+      elig:'<p>Quý vị có thể đăng ký bỏ phiếu ở California nếu đáp ứng các điều kiện sau.</p><ul><li>Là công dân Hoa Kỳ và cư dân California</li><li>Đủ 18 tuổi vào ngày bầu cử</li><li>Hiện không thụ án tù tiểu bang hoặc liên bang vì trọng tội</li><li>Không bị tòa án tuyên bố mất năng lực bỏ phiếu</li></ul><p><strong>Quan trọng.</strong> Chỉ có thẻ xanh (thường trú nhân) hoặc visa thì <strong>không</strong> đủ để đăng ký. Phải là công dân Hoa Kỳ. Người nhập tịch có thể đăng ký như mọi công dân khác. Đăng ký khi không đủ điều kiện có thể gây hậu quả nghiêm trọng, nên nếu còn thắc mắc xin gọi {HOT} trước.</p><p>Người 16 hoặc 17 tuổi có thể đăng ký trước tại {REG}, và sẽ tự động có hiệu lực khi đủ 18 tuổi.</p>',
+      status:'<p>Có ba cách kiểm tra nhanh.</p><ul><li>Trực tuyến bằng công cụ My Voter Status tại {STATUS}</li><li>Nhắn tin từ <strong>VOTE</strong> đến <strong>GOVOTE (468-683)</strong></li><li>Gọi {HOT}</li></ul><p>Công cụ này cũng cho biết quận và đảng phái quý vị đã chọn.</p>',
+      dates:'<p>Các ngày quan trọng của <strong>Tổng tuyển cử ngày 3 tháng 11 năm 2026</strong>.</p><ul><li><strong>5 tháng 10</strong> Các quận bắt đầu gửi lá phiếu qua thư</li><li><strong>6 tháng 10</strong> Hộp thả phiếu an toàn mở cửa</li><li><strong>19 tháng 10</strong> Hạn chót đăng ký thông thường</li><li><strong>20 tháng 10 đến 3 tháng 11</strong> Đăng ký ngay trong ngày tại văn phòng quận và trung tâm bỏ phiếu</li><li><strong>24 tháng 10</strong> Một số trung tâm bỏ phiếu mở cửa ở các quận áp dụng mô hình này</li><li><strong>31 tháng 10</strong> Các trung tâm còn lại mở cửa</li><li><strong>3 tháng 11</strong> Ngày bầu cử, 7 giờ sáng đến 8 giờ tối</li></ul><p>Phiếu gửi thư phải có dấu bưu điện ngày 3 tháng 11 hoặc sớm hơn và đến nơi trong vòng 7 ngày. Lịch đầy đủ có tại {SOS}.</p>',
+      datesOver:'<p>Cuộc bầu cử ngày 3 tháng 11 năm 2026 đã kết thúc. Các quy tắc sau thường lặp lại ở mỗi kỳ bầu cử tại California.</p><ul><li>Đăng ký ít nhất <strong>15 ngày</strong> trước ngày bầu cử. Sau đó có thể đăng ký ngay trong ngày.</li><li>Các quận bắt đầu gửi phiếu qua thư cho mọi cử tri đang hoạt động khoảng 29 ngày trước bầu cử.</li><li>Trung tâm bỏ phiếu mở khoảng 10 ngày trước, và thêm nhiều nơi khoảng 3 ngày trước.</li><li>Hạn chót xin gửi phiếu thay thế qua thư là 7 ngày trước ngày bầu cử.</li><li>Vào ngày bầu cử, điểm bỏ phiếu mở từ <strong>7 giờ sáng đến 8 giờ tối</strong>.</li><li>Phiếu gửi thư phải có dấu bưu điện ngày bầu cử hoặc sớm hơn và đến trong vòng 7 ngày.</li></ul><p>Ngày chính xác của kỳ bầu cử tới có tại {SOS}.</p>',
+      mail:'<p>California tự động gửi lá phiếu qua thư cho mọi cử tri đang hoạt động trước mỗi cuộc bầu cử, nên quý vị không cần xin.</p><p>Quý vị có thể gửi lại bằng một trong các cách sau.</p><ul><li><strong>Qua thư.</strong> Đã trả sẵn cước phí. Phải có dấu bưu điện ngày bầu cử hoặc sớm hơn và đến quận trong vòng 7 ngày.</li><li><strong>Bỏ vào hộp thả phiếu.</strong> Các hộp thả phiếu an toàn đã mở cửa.</li><li><strong>Trực tiếp.</strong> Nộp tại văn phòng bầu cử quận, trung tâm bỏ phiếu hoặc điểm bỏ phiếu trước 8 giờ tối ngày bầu cử.</li></ul><p>Nhớ ký tên trên phong bì phiếu thì phiếu mới được kiểm. Khi gần ngày bầu cử, hộp thả phiếu hoặc trung tâm bỏ phiếu là lựa chọn an toàn nhất.</p>',
+      nbOpen:'<p><strong>Đã quá muộn để xin gửi lá phiếu thay thế qua thư cho cuộc bầu cử này.</strong> Hạn chót xin là ngày 27 tháng 10. <strong>Nhưng quý vị vẫn có thể bỏ phiếu trực tiếp.</strong> Hãy đến văn phòng bầu cử quận hoặc bất kỳ trung tâm bỏ phiếu nào và nhận lá phiếu tại chỗ. Ngày 3 tháng 11 họ mở cửa từ 7 giờ sáng đến 8 giờ tối, và ai đang xếp hàng lúc 8 giờ tối vẫn được bỏ phiếu.</p>',
+      nbOver:'<p>Nếu lá phiếu bị mất, hư hoặc chưa đến, xin liên lạc ngay văn phòng bầu cử quận để xin phiếu thay thế. Có thể xin gửi qua thư đến 7 ngày trước ngày bầu cử. Sau đó vẫn có thể bỏ phiếu trực tiếp tại văn phòng quận hoặc trung tâm bỏ phiếu.</p>',
+      nbTail:'<ul><li>Lá phiếu bị bẩn hoặc hư được xử lý giống như lá phiếu bị mất.</li><li>Lý do thường gặp khi chưa nhận được là địa chỉ đăng ký đã cũ (phiếu không được chuyển tiếp), đăng ký sau hạn chót, hoặc tình trạng đăng ký không còn hoạt động. Xin kiểm tra tại {STATUS}.</li><li>Nếu quý vị đang ở ngoài California, hãy gọi văn phòng bầu cử quận hoặc {HOT} để hỏi có gửi đến địa chỉ hiện tại được không. Phiếu có dấu bưu điện ngày bầu cử hoặc sớm hơn và đến trong 7 ngày vẫn được tính.</li><li>Tìm trung tâm bỏ phiếu gần nhất tại {CENTERS}.</li></ul>',
+      inperson:'<p>Quý vị có thể bỏ phiếu trực tiếp dù đã nhận phiếu qua thư. Tôi không tra cứu được địa điểm theo mã ZIP, nhưng quý vị có thể tìm trung tâm bỏ phiếu, hộp thả phiếu hoặc điểm bỏ phiếu gần nhất tại {CENTERS}. Xin nhập địa chỉ đầy đủ hoặc chọn quận của quý vị.</p><ul><li>Trước ngày bầu cử, các trung tâm thường mở mỗi ngày từ 10 giờ sáng đến 7 giờ tối, tùy quận.</li><li>Vào ngày bầu cử, mở cửa từ <strong>7 giờ sáng đến 8 giờ tối</strong>.</li><li>Ai đang xếp hàng lúc 8 giờ tối vẫn được bỏ phiếu.</li></ul><p>Hãy mang theo lá phiếu gửi thư nếu có, hoặc nói với nhân viên rằng quý vị muốn bỏ phiếu tại chỗ. Nếu đã điền xong phiếu, quý vị cũng có thể bỏ vào bất kỳ hộp thả phiếu an toàn hoặc trung tâm bỏ phiếu nào thay vì gửi thư.</p>',
+      id:'<p>Phần lớn cử tri California <strong>không cần xuất trình giấy tờ tùy thân</strong> khi bỏ phiếu. Mất giấy tờ hoặc không có hộ chiếu thường cũng không sao.</p><ul><li>Nếu đã từng bỏ phiếu ở California thì không cần giấy tờ.</li><li>Nếu khi đăng ký quý vị đã cung cấp số bằng lái hoặc căn cước California, hoặc 4 số cuối An Sinh Xã Hội, thì thường sẽ không bị hỏi.</li><li>Trường hợp ngoại lệ chính là người bỏ phiếu lần đầu, đăng ký qua thư và không cung cấp các số đó. Nếu được yêu cầu, bất kỳ giấy tờ nào có tên và địa chỉ đều được. Không cần phải có hình hay là hộ chiếu.</li></ul><p>Nếu dùng đăng ký ngay trong ngày, hãy hỏi văn phòng bầu cử quận cần mang gì. Quý vị cũng có thể gọi {HOT} trước. Nếu mất giấy tờ, vẫn có thể đến trung tâm bỏ phiếu và trình bày với nhân viên.</p>',
+      contact:'<p>Tôi hoạt động mọi lúc, nhưng nếu quý vị muốn nói chuyện với người thật, xin liên lạc như sau.</p><ul><li><strong>Đường dây cử tri của Bộ trưởng Ngoại vụ (tiếng Việt)</strong> {HOT}</li><li><strong>Email</strong> <a href="mailto:elections@sos.ca.gov">elections@sos.ca.gov</a></li><li><strong>Văn phòng bầu cử quận của quý vị</strong> Hồ sơ đăng ký cử tri được lưu ở đó và thường là cách nhanh nhất cho câu hỏi tại địa phương. Tìm tại {SOS}.</li></ul><p>Nếu đường dây đã đóng khi quý vị gọi được, có thể gửi email, dùng trợ lý này bất cứ lúc nào, hoặc nhắn <strong>VOTE</strong> đến <strong>GOVOTE (468-683)</strong> để kiểm tra đăng ký.</p>',
+      thanks:'<p>Không có chi. Quý vị cần giúp gì nữa không?</p>'
+    }
+  });
+
+  I18N.tl = buildSimple("tl","Tagalog","(800) 339-2957","+18003392957",{
+    ui:{ title:"Katulong ng Botante sa California", sub:"Malinaw na sagot tungkol sa pagpaparehistro at pagboto.", tag:"Hindi kailangang mag-log in", ph:"Magtanong tungkol sa rehistro, deadline, balota sa koreo…", send:"Ipadala", label:"I-type ang iyong tanong",
+      footer:'Ito ay independiyenteng katulong at hindi opisyal na website ng gobyerno. Kumpirmahin ang mahahalagang detalye sa <a href="https://www.sos.ca.gov/elections/" target="_blank" rel="noopener">Kalihim ng Estado ng California</a> o sa tanggapan ng halalan ng iyong county. Isinalin sa tulong ng AI.',
+      banner:{ open:"Ang Araw ng Halalan ay Nobyembre 3, 2026. Magparehistro bago mag-Oktubre 19.", conditional:"Ang Araw ng Halalan ay Nobyembre 3, 2026. Bukas na ang pagpaparehistro sa mismong araw sa mga vote center.", over:"Tapos na ang halalan noong Nobyembre 3, 2026. Pangkalahatan ang mga sagot. Tingnan ang sos.ca.gov/elections para sa susunod." } },
+    fallback:'<p>Hindi ako sigurado kung naintindihan ko. Subukang gumamit ng ibang salita, tulad ng “rehistro”, “balota sa koreo”, “deadline”, o “vote center”, o pumili ng paksa sa ibaba. Para makausap ang tao, tumawag sa {HOT} (Tagalog) o sa tanggapan ng halalan ng iyong county.</p>',
+    onlyEnglish:'<p>Sa Ingles lamang available ang sagot na ito sa ngayon. Para sa tulong sa Tagalog, tumawag sa {HOT}.</p>',
+    labels:{ register:"Paano magparehistro?", late:"Lumampas na ako sa deadline", eligible:"Kwalipikado ba ako?", status:"Tingnan ang rehistro ko", dates:"Mahahalagang petsa", mail:"Pagboto sa koreo", noballot:"Hindi ko natanggap ang balota", inperson:"Pagboto nang personal", id:"Kailangan ba ng ID?", contact:"Makausap ang tao" },
+    strong:{ status:["nakarehistro na ako","rehistrado na ba","kung nakarehistro","nakarehistro na"], late:["huli na","nahuli","lampas na","lumampas na"], eligible:["green card","permanenteng residente"], noballot:["hindi ko natanggap","di ko natanggap","hindi dumating","di dumating","nawala ang balota","natapon","nasira ang balota","bagong balota","kapalit na balota"], id:["nawala ang id","walang id","walang pasaporte","nawala ko ang id"] },
+    kw:{
+      register:["magparehistro","magrehistro","parehistro","rehistro","unang beses","first time"],
+      late:["huli na","nahuli","lampas na","same day","sa araw mismo","parehong araw","kondisyonal","huli pa ba"],
+      eligible:["kwalipik","qualified","maaari ba akong bumoto","pwede ba akong bumoto","puwede ba akong bumoto","mamamayan","citizen","green card","imigr","felony","bilanggo","visa"],
+      status:["rehistrado na ba","nakarehistro","tingnan ang rehistro","i check","icheck","status"],
+      dates:["petsa","kailan","araw ng halalan","iskedyul","deadline","takdang araw"],
+      mail:["koreo","mail","balota","ipadala","ibalik","drop box","dropbox","selyo"],
+      noballot:["hindi ko natanggap","di ko natanggap","hindi dumating","di dumating","wala pa","nawala","natapon","nasira","napunit","pamalit","bagong balota","kapalit","labas ng california","ibang estado","wala ako sa"],
+      inperson:["personal","sentro ng pagboto","botohan","saan ako boboto","saan boboto","malapit","anong oras","bukas","vote center","sa lugar ng pagboto"],
+      id:[" id ","pagkakakilanlan","pasaporte","lisensya","lisensiya","identification"],
+      contact:["tawag","tumawag","telepono","numero","kausapin","makausap","tao","makipag","hotline"],
+      hello:["kumusta","kamusta","magandang","hello","hi "], thanks:["salamat"]
+    },
+    s:{
+      greet:'<p>Kumusta! Ako ang Katulong ng Botante sa California. Maipapaliwanag ko kung paano magparehistro, ang mga deadline, kung paano bumoto sa koreo o nang personal, at kung sino ang makakausap.</p><p>Pumili ng tanong sa ibaba o i-type ang sarili mong tanong.</p>',
+      reg:'<p>Ang pinakamabilis ay magparehistro online sa {REG}. Piliin ang <strong>Register to Vote Now</strong>. Ilang minuto lang ito at available ang website sa 10 wika.</p><p>Ihanda ang mga sumusunod.</p><ul><li>Numero ng lisensya sa pagmamaneho o ID ng California, o ang huling apat na numero ng Social Security number</li><li>Petsa ng kapanganakan</li></ul><p>Walang computer? Tumawag sa {HOT} o sa tanggapan ng halalan ng iyong county at humiling ng papel na porma sa koreo.</p>',
+      regOpen:'<p><strong>Ang deadline ng pagpaparehistro para sa halalan sa Nobyembre 3 ay Lunes, Oktubre 19, 2026.</strong> Dapat maisumite online sa araw na iyon, at ang ipinadala sa koreo ay dapat may postmark na hindi lalampas doon.</p><p>Kung hindi umabot, maaari ka pa ring magparehistro at bumoto sa mismong araw (piliin ang “Lumampas na ako sa deadline”).</p>',
+      regCond:'<p><strong>Lumipas na ang karaniwang deadline para sa halalan sa Nobyembre 3 (Oktubre 19).</strong> Maaari ka pa ring magparehistro at bumoto sa mismong araw. Piliin ang “Lumampas na ako sa deadline” para sa paraan.</p>',
+      regOver:'<p>Tapos na ang halalan noong Nobyembre 3, 2026. Sa California, ang karaniwang deadline ng rehistro ay 15 araw bago ang Araw ng Halalan. Ang mga petsa ng susunod na halalan ay nasa {SOS}.</p>',
+      late:'<p>Maaari ka pa ring makilahok. May <strong>pagpaparehistro sa mismong araw</strong> ang California, na tinatawag ding conditional voter registration, para sa mga hindi nakapagparehistro nang maaga.</p><ul><li>Maaari ito hanggang sa mismong Araw ng Halalan.</li><li>Pumunta sa tanggapan ng halalan ng iyong county o sa anumang vote center, magparehistro, at bumoto gamit ang pansamantalang balota sa mismong lugar.</li><li>Mabibilang ang iyong balota kapag nakumpirma ng county ang iyong rehistro.</li><li>Maaaring hingan ka ng ID, kaya dalhin ang lisensya o ibang dokumentong may pangalan at address mo.</li></ul><p>Maghanap ng lugar sa {CENTERS}. Sa Araw ng Halalan, bukas ang mga vote center mula 7 n.u. hanggang 8 n.g.</p>',
+      elig:'<p>Maaari kang magparehistro sa California kung natutugunan mo ang mga sumusunod.</p><ul><li>Mamamayan ka ng U.S. at residente ng California</li><li>Hindi bababa sa 18 taong gulang sa Araw ng Halalan</li><li>Hindi kasalukuyang nagsisilbi ng sentensya sa bilangguan ng estado o pederal dahil sa felony</li><li>Hindi idineklara ng hukuman na walang kakayahang bumoto</li></ul><p><strong>Mahalaga.</strong> Ang green card (permanenteng residente) o visa lamang ay <strong>hindi</strong> sapat para magparehistro. Dapat kang mamamayan ng U.S. Ang naturalized na mamamayan ay maaaring magparehistro tulad ng iba. Ang pagpaparehistro nang hindi kwalipikado ay maaaring magdulot ng malubhang problema, kaya kung may duda, tumawag muna sa {HOT}.</p><p>Ang 16 o 17 taong gulang ay maaaring mag-pre-register sa {REG} at awtomatikong magiging rehistrado pagtuntong ng 18.</p>',
+      status:'<p>Tatlong mabilis na paraan para tingnan.</p><ul><li>Online gamit ang My Voter Status sa {STATUS}</li><li>Mag-text ng <strong>VOTE</strong> sa <strong>GOVOTE (468-683)</strong></li><li>Tumawag sa {HOT}</li></ul><p>Ipinapakita rin nito ang iyong county at piniling partido.</p>',
+      dates:'<p>Mahahalagang petsa para sa <strong>Pangkalahatang Halalan sa Nobyembre 3, 2026</strong>.</p><ul><li><strong>Oktubre 5</strong> Sisimulan ng mga county ang pagpapadala ng balota sa koreo</li><li><strong>Oktubre 6</strong> Bukas na ang mga ligtas na drop box</li><li><strong>Oktubre 19</strong> Huling araw ng karaniwang pagpaparehistro</li><li><strong>Oktubre 20 hanggang Nobyembre 3</strong> Pagpaparehistro sa mismong araw sa tanggapan ng county at mga vote center</li><li><strong>Oktubre 24</strong> Bukas ang ilang vote center sa mga county na gumagamit ng modelong ito</li><li><strong>Oktubre 31</strong> Bukas na ang iba pang vote center</li><li><strong>Nobyembre 3</strong> Araw ng Halalan, 7 n.u. hanggang 8 n.g.</li></ul><p>Ang balota sa koreo ay dapat may postmark na Nobyembre 3 o mas maaga at dumating sa loob ng 7 araw. Ang buong kalendaryo ay nasa {SOS}.</p>',
+      datesOver:'<p>Tapos na ang halalan noong Nobyembre 3, 2026. Ganito karaniwan ang mga tuntunin sa bawat halalan sa California.</p><ul><li>Magparehistro nang hindi bababa sa <strong>15 araw</strong> bago ang Araw ng Halalan. Pagkatapos nito, puwede ang pagpaparehistro sa mismong araw.</li><li>Nagsisimulang magpadala ang mga county ng balota sa koreo sa lahat ng aktibong botante mga 29 araw bago ang halalan.</li><li>Nagbubukas ang mga vote center mga 10 araw bago, at mas marami pa mga 3 araw bago.</li><li>Ang huling araw para humiling ng kapalit na balota sa koreo ay 7 araw bago ang Araw ng Halalan.</li><li>Sa Araw ng Halalan, bukas ang botohan mula <strong>7 n.u. hanggang 8 n.g.</strong></li><li>Ang balota sa koreo ay dapat may postmark ng Araw ng Halalan o mas maaga at dumating sa loob ng 7 araw.</li></ul><p>Ang eksaktong petsa ng susunod na halalan ay nasa {SOS}.</p>',
+      mail:'<p>Awtomatikong nagpapadala ang California ng balota sa koreo sa bawat aktibong rehistradong botante bago ang bawat halalan, kaya hindi mo na kailangang humiling.</p><p>Maaari mo itong ibalik sa alinman sa mga paraang ito.</p><ul><li><strong>Sa koreo.</strong> Bayad na ang selyo. Dapat may postmark ng Araw ng Halalan o mas maaga at dumating sa county sa loob ng 7 araw.</li><li><strong>Sa drop box.</strong> Bukas na ang mga ligtas na drop box.</li><li><strong>Nang personal.</strong> Sa tanggapan ng halalan ng county, vote center, o lugar ng botohan bago mag-8 n.g. sa Araw ng Halalan.</li></ul><p>Pirmahan ang sobre ng balota para mabilang ito. Kung malapit na ang halalan, pinakaligtas ang drop box o vote center.</p>',
+      nbOpen:'<p><strong>Huli na para humiling ng kapalit na balota sa koreo para sa halalang ito.</strong> Ang huling araw ng paghiling ay Oktubre 27. <strong>Pero maaari ka pa ring bumoto nang personal.</strong> Pumunta sa tanggapan ng halalan ng county o sa anumang vote center at kunin ang balota doon mismo. Sa Nobyembre 3, bukas sila mula 7 n.u. hanggang 8 n.g., at kung nasa pila ka pagsapit ng 8 n.g., makakaboto ka pa rin.</p>',
+      nbOver:'<p>Kung nawala, nasira, o hindi dumating ang balota, makipag-ugnayan agad sa tanggapan ng halalan ng county para humiling ng kapalit. Maaaring humiling sa koreo hanggang 7 araw bago ang Araw ng Halalan. Pagkatapos nito, maaari ka pa ring bumoto nang personal sa tanggapan ng county o vote center.</p>',
+      nbTail:'<ul><li>Ang natapunan o nasirang balota ay itinuturing na parang nawalang balota.</li><li>Karaniwang dahilan ng hindi pagdating ay luma na ang rehistradong address (hindi ipinapasa ang balota), nagparehistro pagkatapos ng deadline, o hindi aktibo ang rehistro. Tingnan sa {STATUS}.</li><li>Kung nasa labas ka ng California, tumawag sa tanggapan ng county o sa {HOT} at itanong kung maipapadala sa kinaroroonan mo. Mabibilang ang balota sa koreo kung may postmark ng Araw ng Halalan o mas maaga at dumating sa loob ng 7 araw.</li><li>Hanapin ang pinakamalapit na vote center sa {CENTERS}.</li></ul>',
+      inperson:'<p>Maaari kang bumoto nang personal kahit nakatanggap ka ng balota sa koreo. Hindi ako makakahanap ng lugar ayon sa ZIP code, pero mahahanap mo ang pinakamalapit na vote center, drop box, o lugar ng botohan sa {CENTERS}. Ilagay ang buong address o piliin ang iyong county.</p><ul><li>Bago ang Araw ng Halalan, karaniwang bukas ang mga vote center araw-araw mula 10 n.u. hanggang 7 n.g., depende sa county.</li><li>Sa Araw ng Halalan, bukas mula <strong>7 n.u. hanggang 8 n.g.</strong></li><li>Kung nasa pila ka pagsapit ng 8 n.g., makakaboto ka pa rin.</li></ul><p>Dalhin ang balota sa koreo kung mayroon, o sabihin sa staff na gusto mong bumoto doon. Kung nakumpleto mo na ang balota, maaari mo rin itong ihulog sa anumang ligtas na drop box o vote center sa halip na ipadala sa koreo.</p>',
+      id:'<p>Karamihan ng botante sa California ay <strong>hindi kailangang magpakita ng ID</strong> para bumoto. Karaniwang hindi rin problema kung nawala ang ID o walang pasaporte.</p><ul><li>Kung nakaboto ka na dati sa California, hindi mo kailangan ng ID.</li><li>Kung nagparehistro ka gamit ang numero ng lisensya o ID ng California, o ang huling apat na numero ng Social Security, kadalasan ay hindi ka hihingan.</li><li>Ang pangunahing eksepsyon ay ang unang beses na bumoboto, nagparehistro sa koreo, at hindi nagbigay ng alinman sa mga numerong iyon. Kung hingan ka, sapat na ang anumang dokumentong may pangalan at address. Hindi kailangang may litrato o pasaporte.</li></ul><p>Kung gagamit ka ng pagpaparehistro sa mismong araw, itanong sa tanggapan ng county kung ano ang dadalhin. Maaari ka ring tumawag muna sa {HOT}. Kung nawala ang ID mo, maaari ka pa ring pumunta sa vote center at ipaliwanag ang sitwasyon sa staff.</p>',
+      contact:'<p>Narito ako anumang oras, pero kung gusto mong makausap ang tao, narito ang mga mapagtatanungan.</p><ul><li><strong>Voter hotline ng Kalihim ng Estado (Tagalog)</strong> {HOT}</li><li><strong>Email</strong> <a href="mailto:elections@sos.ca.gov">elections@sos.ca.gov</a></li><li><strong>Tanggapan ng halalan ng iyong county</strong> Doon nakatago ang iyong rehistro at kadalasan ito ang pinakamabilis para sa lokal na tanong. Hanapin sa {SOS}.</li></ul><p>Kung sarado ang hotline kapag nakakatawag ka, maaari kang mag-email, gamitin ang katulong na ito anumang oras, o mag-text ng <strong>VOTE</strong> sa <strong>GOVOTE (468-683)</strong> para tingnan ang rehistro.</p>',
+      thanks:'<p>Walang anuman. May iba pa ba akong maitutulong?</p>'
+    }
+  });
+
+  I18N.ko = buildSimple("ko","한국어","(866) 575-1558","+18665751558",{
+    ui:{ title:"캘리포니아 유권자 도우미", sub:"유권자 등록과 투표에 대한 쉬운 안내.", tag:"로그인 불필요", ph:"등록, 마감일, 우편 투표용지에 대해 질문하세요…", send:"보내기", label:"질문을 입력하세요",
+      footer:'이 도우미는 독립적으로 운영되며 정부 공식 사이트가 아닙니다. 중요한 내용은 <a href="https://www.sos.ca.gov/elections/" target="_blank" rel="noopener">캘리포니아 주 총무장관실</a>이나 거주 카운티 선거 사무소에 확인하세요. AI의 도움으로 번역되었습니다.',
+      banner:{ open:"선거일은 2026년 11월 3일입니다. 10월 19일까지 등록하세요.", conditional:"선거일은 2026년 11월 3일입니다. 투표 센터에서 당일 등록이 가능합니다.", over:"2026년 11월 3일 선거는 끝났습니다. 답변은 일반 안내입니다. 다음 선거는 sos.ca.gov/elections에서 확인하세요." } },
+    fallback:'<p>무슨 말씀인지 잘 모르겠습니다. “등록”, “우편 투표용지”, “마감일”, “투표 센터”처럼 다른 말로 입력하시거나 아래 주제를 눌러 보세요. 담당자와 통화하려면 {HOT}(한국어)로 전화하시거나 거주 카운티 선거 사무소에 문의하세요.</p>',
+    onlyEnglish:'<p>이 답변은 현재 영어로만 제공됩니다. 한국어 도움은 {HOT}로 전화하세요.</p>',
+    labels:{ register:"어떻게 등록하나요?", late:"마감일을 놓쳤어요", eligible:"자격이 되나요?", status:"내 등록 확인", dates:"중요한 날짜", mail:"우편 투표", noballot:"투표용지를 못 받았어요", inperson:"직접 투표", id:"신분증이 필요한가요?", contact:"담당자와 통화" },
+    strong:{ late:["마감일을 놓","놓쳤","당일 등록","너무 늦"], eligible:["영주권","그린카드","그린 카드"], noballot:["못 받","못받","안 왔","안왔","도착하지 않","분실","잃어버린 투표","잃어버린 우편","쏟았","찢어","훼손","재발급","새 투표용지"], id:["신분증이 없","신분증 없","신분증을 잃","여권이 없","여권 없"] },
+    kw:{
+      register:["등록","유권자 등록","처음 투표","첫 투표"],
+      late:["마감","늦","놓쳤","당일 등록","같은 날","조건부"],
+      eligible:["자격","시민권","영주권","그린카드","그린 카드","투표할 수","중범죄","비자","시민"],
+      status:["확인","등록되어","등록 여부","상태","조회"],
+      dates:["날짜","언제","일정","선거일","기한"],
+      mail:["우편","투표함","반송","발송","드롭박스","드롭 박스","우표"],
+      noballot:["못 받","못받","안 왔","안왔","도착하지","분실","잃어","쏟","찢","훼손","재발급","새 투표용지","다시 받","캘리포니아 밖","타주","다른 주","해외"],
+      inperson:["직접","투표소","투표센터","투표 센터","어디서","가까운","몇 시","몇시","운영 시간","열어","우편번호"],
+      id:["신분증","여권","운전면허","면허증","아이디"],
+      contact:["전화","연락","상담","사람과","담당자","번호","핫라인","이메일"],
+      hello:["안녕","여보세요","하이"], thanks:["감사","고맙","땡큐"]
+    },
+    s:{
+      greet:'<p>안녕하세요! 저는 캘리포니아 유권자 도우미입니다. 등록 방법, 마감일, 우편 또는 직접 투표 방법, 문의할 곳을 안내해 드립니다.</p><p>아래 질문을 누르시거나 직접 질문을 입력하세요.</p>',
+      reg:'<p>가장 빠른 방법은 {REG}에서 온라인으로 등록하는 것입니다. <strong>Register to Vote Now</strong>(지금 등록)를 선택하세요. 몇 분이면 되고 사이트는 10개 언어를 지원합니다.</p><p>다음을 준비하세요.</p><ul><li>캘리포니아 운전면허증 또는 신분증 번호, 또는 사회보장번호 뒤 4자리</li><li>생년월일</li></ul><p>컴퓨터가 없으면 {HOT} 또는 거주 카운티 선거 사무소에 전화해서 종이 양식을 우편으로 보내 달라고 하세요.</p>',
+      regOpen:'<p><strong>11월 3일 선거의 등록 마감일은 2026년 10월 19일 월요일입니다.</strong> 온라인 신청은 그날까지 제출해야 하고, 우편 신청은 소인이 그날이거나 그 이전이어야 합니다.</p><p>마감을 놓쳤더라도 당일 등록 후 투표할 수 있습니다. “마감일을 놓쳤어요”를 눌러 보세요.</p>',
+      regCond:'<p><strong>11월 3일 선거의 일반 등록 마감일(10월 19일)은 지났습니다.</strong> 그래도 당일 등록 후 투표할 수 있습니다. 방법은 “마감일을 놓쳤어요”를 눌러 확인하세요.</p>',
+      regOver:'<p>2026년 11월 3일 선거는 끝났습니다. 캘리포니아의 일반 등록 마감일은 선거일 15일 전입니다. 다음 선거 날짜는 {SOS}에서 확인하세요.</p>',
+      late:'<p>아직 참여할 수 있습니다. 캘리포니아는 제때 등록하지 못한 분을 위해 <strong>당일 등록</strong>(조건부 유권자 등록)을 제공합니다.</p><ul><li>선거일 당일까지 가능합니다.</li><li>거주 카운티 선거 사무소나 아무 투표 센터에 가서 등록하고 그 자리에서 임시 투표용지로 투표하세요.</li><li>카운티가 등록을 확인하면 투표가 집계됩니다.</li><li>신분 확인을 요청받을 수 있으니 운전면허증이나 이름과 주소가 나온 서류를 가져가세요.</li></ul><p>장소는 {CENTERS}에서 찾으세요. 선거일에는 투표 센터가 오전 7시부터 오후 8시까지 운영됩니다.</p>',
+      elig:'<p>다음 조건을 충족하면 캘리포니아에서 유권자 등록을 할 수 있습니다.</p><ul><li>미국 시민이며 캘리포니아 거주자</li><li>선거일 기준 만 18세 이상</li><li>중범죄로 주 교도소나 연방 교도소에서 복역 중이 아님</li><li>법원에서 투표 능력이 없다고 판결받지 않음</li></ul><p><strong>중요.</strong> 영주권(그린카드)이나 비자만으로는 등록할 수 <strong>없습니다</strong>. 미국 시민이어야 합니다. 귀화한 시민은 다른 시민과 똑같이 등록할 수 있습니다. 자격이 없는데 등록하면 심각한 문제가 생길 수 있으니 확실하지 않으면 먼저 {HOT}로 문의하세요.</p><p>16세 또는 17세는 {REG}에서 사전 등록할 수 있고 만 18세가 되면 자동으로 등록됩니다.</p>',
+      status:'<p>빠른 확인 방법 세 가지입니다.</p><ul><li>온라인 My Voter Status 도구 {STATUS}</li><li><strong>GOVOTE (468-683)</strong>로 <strong>VOTE</strong> 문자 보내기</li><li>{HOT}로 전화</li></ul><p>소속 카운티와 선택한 정당도 함께 표시됩니다.</p>',
+      dates:'<p><strong>2026년 11월 3일 총선거</strong>의 중요한 날짜입니다.</p><ul><li><strong>10월 5일</strong> 카운티에서 우편 투표용지 발송 시작</li><li><strong>10월 6일</strong> 보안 투표함 운영 시작</li><li><strong>10월 19일</strong> 일반 등록 마감일</li><li><strong>10월 20일~11월 3일</strong> 카운티 사무소와 투표 센터에서 당일 등록</li><li><strong>10월 24일</strong> 해당 방식을 쓰는 카운티의 일부 투표 센터 개방</li><li><strong>10월 31일</strong> 나머지 투표 센터 개방</li><li><strong>11월 3일</strong> 선거일, 오전 7시~오후 8시</li></ul><p>우편 투표용지는 소인이 11월 3일 또는 그 이전이어야 하며 7일 이내에 도착해야 합니다. 전체 일정은 {SOS}에서 확인하세요.</p>',
+      datesOver:'<p>2026년 11월 3일 선거는 끝났습니다. 캘리포니아 선거에는 대체로 다음 규칙이 적용됩니다.</p><ul><li>선거일 <strong>15일 전</strong>까지 등록합니다. 그 후에는 당일 등록을 이용할 수 있습니다.</li><li>카운티는 선거 약 29일 전부터 모든 활성 유권자에게 우편 투표용지를 보냅니다.</li><li>투표 센터는 약 10일 전에 열고 약 3일 전에는 더 많이 엽니다.</li><li>우편 대체 투표용지 요청 마감은 선거일 7일 전입니다.</li><li>선거일 투표 시간은 <strong>오전 7시~오후 8시</strong>입니다.</li><li>우편 투표용지는 소인이 선거일 또는 그 이전이어야 하며 7일 이내에 도착해야 합니다.</li></ul><p>다음 선거의 정확한 날짜는 {SOS}에서 확인하세요.</p>',
+      mail:'<p>캘리포니아는 모든 선거 전에 활성 등록 유권자에게 우편 투표용지를 자동으로 보내므로 따로 신청할 필요가 없습니다.</p><p>다음 중 한 가지 방법으로 제출하세요.</p><ul><li><strong>우편.</strong> 우표는 이미 지불되어 있습니다. 소인이 선거일 또는 그 이전이어야 하고 7일 이내에 카운티에 도착해야 합니다.</li><li><strong>투표함.</strong> 보안 투표함이 이미 운영 중입니다.</li><li><strong>직접 제출.</strong> 선거일 오후 8시까지 카운티 선거 사무소, 투표 센터, 투표소에 제출합니다.</li></ul><p>투표용지 봉투에 서명해야 집계됩니다. 선거일이 가까우면 투표함이나 투표 센터가 가장 안전합니다.</p>',
+      nbOpen:'<p><strong>이번 선거에서는 우편으로 대체 투표용지를 요청하기에는 이미 늦었습니다.</strong> 요청 마감일은 10월 27일이었습니다. <strong>하지만 직접 투표할 수 있습니다.</strong> 카운티 선거 사무소나 아무 투표 센터에 가면 현장에서 투표용지를 받아 투표할 수 있습니다. 11월 3일에는 오전 7시부터 오후 8시까지 운영되며 오후 8시에 줄을 서 있으면 투표할 수 있습니다.</p>',
+      nbOver:'<p>투표용지를 잃어버렸거나 훼손되었거나 받지 못했다면 가능한 한 빨리 카운티 선거 사무소에 연락해 대체본을 요청하세요. 우편 요청은 선거일 7일 전까지 가능합니다. 그 이후에도 카운티 사무소나 투표 센터에서 직접 투표할 수 있습니다.</p>',
+      nbTail:'<ul><li>음료 등을 쏟아 훼손된 투표용지는 분실한 것과 똑같이 처리됩니다.</li><li>못 받는 흔한 이유는 등록 주소가 오래되었거나(우편물 전달 안 됨), 마감 후에 등록했거나, 등록 상태가 활성이 아닌 경우입니다. {STATUS}에서 확인하세요.</li><li>캘리포니아 밖에 계시면 카운티 선거 사무소나 {HOT}에 전화해서 현재 계신 곳으로 보내 줄 수 있는지 문의하세요. 소인이 선거일 또는 그 이전이고 7일 이내에 도착하면 집계됩니다.</li><li>가장 가까운 투표 센터는 {CENTERS}에서 찾으세요.</li></ul>',
+      inperson:'<p>우편 투표용지를 받았더라도 직접 투표할 수 있습니다. 저는 우편번호로 장소를 찾아 드릴 수 없지만 {CENTERS}에서 전체 주소를 입력하거나 카운티를 선택하면 가장 가까운 투표 센터, 투표함, 투표소를 찾을 수 있습니다.</p><ul><li>선거일 전에는 투표 센터가 보통 매일 오전 10시~오후 7시에 열며 카운티마다 조금 다릅니다.</li><li>선거일에는 <strong>오전 7시~오후 8시</strong>에 운영합니다.</li><li>오후 8시에 줄을 서 있으면 투표할 수 있습니다.</li></ul><p>우편 투표용지가 있으면 가져가거나, 직원에게 현장에서 투표하겠다고 말하세요. 이미 작성했다면 우편 대신 보안 투표함이나 투표 센터에 넣어도 됩니다.</p>',
+      id:'<p>대부분의 캘리포니아 유권자는 투표할 때 <strong>신분증을 보여 줄 필요가 없습니다</strong>. 신분증을 잃어버렸거나 여권이 없어도 보통 문제되지 않습니다.</p><ul><li>캘리포니아에서 이전에 투표한 적이 있으면 신분증이 필요 없습니다.</li><li>캘리포니아 운전면허증 또는 신분증 번호나 사회보장번호 뒤 4자리로 등록했다면 보통 요구받지 않습니다.</li><li>주된 예외는 처음 투표하면서 우편으로 등록했고 그 번호들을 제공하지 않은 경우입니다. 요구받으면 이름과 주소가 나온 서류면 충분하며 사진이 있는 신분증이나 여권일 필요는 없습니다.</li></ul><p>당일 등록을 이용할 경우 카운티 선거 사무소에 무엇을 가져가야 하는지 물어보세요. 가기 전에 {HOT}로 전화해도 됩니다. 신분증을 잃어버렸더라도 투표 센터에 가서 직원에게 상황을 설명할 수 있습니다.</p>',
+      contact:'<p>저는 언제든 이용할 수 있지만 담당자와 직접 이야기하고 싶으시다면 아래로 문의하세요.</p><ul><li><strong>총무장관실 유권자 전화(한국어)</strong> {HOT}</li><li><strong>이메일</strong> <a href="mailto:elections@sos.ca.gov">elections@sos.ca.gov</a></li><li><strong>거주 카운티 선거 사무소</strong> 유권자 등록 기록이 보관되어 있어 지역 문의에는 보통 가장 빠릅니다. {SOS}에서 찾으세요.</li></ul><p>전화 가능한 시간에 상담 전화가 닫혀 있다면 이메일을 보내거나 이 도우미를 언제든 사용하거나 <strong>GOVOTE (468-683)</strong>로 <strong>VOTE</strong> 문자를 보내 등록 상태를 확인하세요.</p>',
+      thanks:'<p>천만에요. 더 도와드릴 일이 있나요?</p>'
+    }
+  });
+
   /* ---------- UI ---------- */
+  I18N.en = { code:"en", name:"English", ui:{
+    title:"California Voter Helper", sub:"Plain answers about registering and voting.", tag:"No login needed",
+    ph:"Ask about registering, deadlines, mail ballots…", send:"Send", label:"Type your question",
+    footer:'This is an independent helper and not an official government site. Always confirm important details with the <a href="https://www.sos.ca.gov/elections/" target="_blank" rel="noopener">California Secretary of State</a> or your county elections office.',
+    banner:{ open:"Election Day is November 3, 2026. Register by October 19.", conditional:"Election Day is November 3, 2026. Same-day registration is open at vote centers.", over:"The November 3, 2026 election has passed. Answers are general. Check sos.ca.gov/elections for the next one." }
+  }};
+  var LANGS = ["en","es","zh","vi","tl","ko"];
+  var LANG = "en";
+  var pack = I18N.en;
+
   var log = document.getElementById("log");
   var chips = document.getElementById("chips");
   var form = document.getElementById("form");
   var input = document.getElementById("q");
-  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
   var banner = document.getElementById("banner");
-  if(PHASE==="open"){ banner.textContent = "Election Day is November 3, 2026. Register by October 19."; banner.hidden=false; }
-  else if(PHASE==="over"){ banner.textContent = "The November 3, 2026 election has passed. Answers are general. Check sos.ca.gov/elections for the next one."; banner.hidden=false; }
-  else if(PHASE==="conditional"){ banner.textContent = "Election Day is November 3, 2026. Same-day registration is open at vote centers."; banner.hidden=false; }
+  var langSel = document.getElementById("lang");
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var FALLBACK_NEXT = ["register","dates","mail","inperson","status","contact"];
+
+  function topicFor(id){
+    if(LANG!=="en" && pack.topics && pack.topics[id]) return pack.topics[id];
+    return T[id];
+  }
+  function isNative(id){ return LANG==="en" || !!(pack.topics && pack.topics[id]); }
+
+  function applyUi(){
+    var u = pack.ui;
+    document.documentElement.lang = LANG==="zh" ? "zh-Hans" : LANG;
+    document.title = u.title;
+    document.getElementById("t-title").textContent = u.title;
+    document.getElementById("t-sub").textContent = u.sub;
+    document.getElementById("t-tag").textContent = u.tag;
+    input.placeholder = u.ph;
+    document.getElementById("send").textContent = u.send;
+    document.getElementById("q-label").textContent = u.label;
+    document.getElementById("foot").innerHTML = u.footer;
+    var b = u.banner[PHASE]; banner.textContent = b || ""; banner.hidden = !b;
+  }
 
   function addMsg(html, who){
     var row = document.createElement("div");
@@ -326,7 +692,7 @@
     }
     var d = document.createElement("div");
     d.className = "msg " + kind;
-    if(typing){ d.innerHTML = '<span class="dots" role="status" aria-label="Typing"><i></i><i></i><i></i></span>'; }
+    if(typing){ d.innerHTML = '<span class="dots" role="status" aria-label="…"><i></i><i></i><i></i></span>'; }
     else if(kind==="user"){ d.textContent = html; }
     else { d.innerHTML = html; }
     row.appendChild(d);
@@ -339,7 +705,7 @@
   function showChips(ids){
     chips.innerHTML = "";
     ids.forEach(function(id){
-      var t = T[id]; if(!t || !t.label) return;
+      var t = topicFor(id); if(!t || !t.label || !isNative(id)) return;
       var b = document.createElement("button");
       b.type = "button"; b.className = "chip"; b.textContent = t.label;
       b.addEventListener("click", function(){ ask(t.label, id); });
@@ -348,39 +714,99 @@
   }
 
   function reply(id){
-    var t = T[id] || T.fallback;
-    var typing = addMsg("Typing…", "bot typing");
+    var typing = addMsg("", "bot typing");
     var wait = reduce ? 0 : 450;
     setTimeout(function(){
       typing.remove();
-      addMsg(t.html(), "bot");
-      showChips(t.next || T.fallback.next);
+      var html, next;
+      if(id==="fallback"){
+        html = LANG==="en" ? T.fallback.html() : pack.ui.fallback;
+        next = LANG==="en" ? T.fallback.next : FALLBACK_NEXT;
+      } else {
+        var t = topicFor(id);
+        html = t.html(); next = t.next || FALLBACK_NEXT;
+        if(!isNative(id)) html = pack.ui.onlyEnglish + html;
+      }
+      addMsg(html, "bot");
+      showChips(next);
     }, wait);
   }
 
-  function norm(s){ return " " + s.toLowerCase().replace(/[\u2018\u2019\u02BC]/g,"'").replace(/[^a-z0-9àâçéèêëîïôûùüÿñæœ' ]/g," ").replace(/\s+/g," ").trim() + " "; }
+  /* Fold accents and punctuation so typing without accents still matches. */
+  function norm(s){
+    s = s.toLowerCase().replace(/[‘’ʼ]/g,"'");
+    try { s = s.normalize("NFD").replace(/[̀-ͯ]/g,""); } catch(e){}
+    s = s.replace(/đ/g,"d");
+    return " " + s.replace(/[\u0000-&(-/:-@[-`{-¿ -⁯　-〿＀-／：-＠]/g," ").replace(/\s+/g," ").trim() + " ";
+  }
+  function needleFor(k, stem){
+    var n = norm(k);
+    if(!stem) return n;
+    return (/^\s/.test(k)?" ":"") + n.trim() + (/\s$/.test(k)?" ":"");
+  }
+  function weight(needle){
+    var core = needle.trim();
+    return (core.length > 3 || /[^\x00-\x7f]/.test(core)) ? 2 + core.split(" ").length : 1;
+  }
 
-  function match(text){
+  /* Score every topic in a set. Stem mode lets "registr" match "registrarme". */
+  function matchIn(set, text, stem, skipIds){
     var s = norm(text), best = null, bestScore = 0;
-    Object.keys(T).forEach(function(id){
-      var kw = T[id].kw || (T[id].test ? [] : null); if(!kw) return;
+    Object.keys(set).forEach(function(id){
+      if(skipIds && skipIds[id]) return;
+      var tp = set[id];
+      var kw = tp.kw || (tp.test ? [] : null); if(!kw) return;
       var score = 0;
       kw.forEach(function(k){
-        var needle = norm(k);
-        if(s.indexOf(needle) !== -1) score += needle.trim().length > 3 ? 2 + needle.trim().split(" ").length : 1;
+        var needle = needleFor(k, stem);
+        if(needle.trim() && s.indexOf(needle) !== -1) score += weight(needle);
       });
-      if(T[id].test && T[id].test(text)) score += 15;
-      if(T[id].strong){ T[id].strong.forEach(function(k){ if(s.indexOf(norm(k))!==-1) score += 20; }); }
-      if(score>0 && T[id].boost) score += T[id].boost;
+      if(tp.test && tp.test(text)) score += 15;
+      if(tp.strong){ tp.strong.forEach(function(k){ var n = needleFor(k, stem); if(n.trim() && s.indexOf(n)!==-1) score += 20; }); }
+      if(score>0 && tp.boost) score += tp.boost;
       if(score > bestScore){ bestScore = score; best = id; }
     });
     return best;
+  }
+
+  function match(text){
+    if(LANG==="en") return matchIn(T, text, false);
+    var hit = matchIn(pack.topics, text, true);
+    if(hit) return hit;
+    return matchIn(T, text, false, pack.topics);
   }
 
   function ask(text, forcedId){
     addMsg(text, "user");
     reply(forcedId || match(text) || "fallback");
   }
+
+  function startConversation(){
+    log.innerHTML = ""; chips.innerHTML = "";
+    var g = topicFor("greet");
+    addMsg(g.html(), "bot");
+    showChips(g.next);
+  }
+
+  function setLang(code, quiet){
+    if(LANGS.indexOf(code)===-1 || !I18N[code]) code = "en";
+    LANG = code; pack = I18N[code];
+    if(langSel) langSel.value = code;
+    try { localStorage.setItem("cvh-lang", code); } catch(e){}
+    applyUi();
+    if(!quiet) startConversation();
+  }
+
+  if(langSel){
+    LANGS.forEach(function(c){
+      var o = document.createElement("option"); o.value = c; o.textContent = I18N[c].name; langSel.appendChild(o);
+    });
+    langSel.addEventListener("change", function(){ setLang(langSel.value); input.focus(); });
+  }
+  log.addEventListener("click", function(e){
+    var b = e.target.closest ? e.target.closest("[data-lang]") : null;
+    if(b){ setLang(b.getAttribute("data-lang")); }
+  });
 
   form.addEventListener("submit", function(e){
     e.preventDefault();
@@ -389,8 +815,10 @@
     ask(v);
   });
 
-  addMsg(T.greet.html(), "bot");
-  showChips(T.greet.next);
+  var saved = "en";
+  try { saved = localStorage.getItem("cvh-lang") || "en"; } catch(e){}
+  setLang(saved, true);
+  startConversation();
 })();
 </script>
 </body>
