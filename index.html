@@ -106,7 +106,7 @@
 
   T.register = { label:"How do I register?", kw:["register","registration","sign up","signup","become a voter","enroll","apply to vote","new voter","first time"], html: function(){
     if(PHASE==="over") return overNote + '<p>To register for a future election, apply online at '+REG+'. You will need a California driver’s license or ID number (or the last four digits of your Social Security number) and your date of birth.</p>';
-    var s = '<p>The fastest way is online at '+REG+'. It takes a few minutes and is available in 10 languages.</p>'
+    var s = '<p>The fastest way is online at '+REG+'. On that page, choose <strong>Register to Vote Now</strong>. It takes a few minutes and is available in 10 languages.</p>'
       + '<p>Have these ready.</p><ul><li>Your California driver’s license or ID number, or the last four digits of your Social Security number</li><li>Your date of birth</li></ul>'
       + '<p>No computer? Call '+HOTLINE+' or your county elections office and ask for a paper form to be mailed to you.</p>';
     if(PHASE==="open") s += '<p><strong>Deadline for the November 3 election is Monday, October 19, 2026.</strong> Online applications must be in by then, and mailed forms must be postmarked by then.</p><p>If you miss it, you can still register and vote on the same day (see “Missed the deadline”).</p>';
@@ -124,12 +124,12 @@
       + '<p>Find a location at '+CENTERS+'. On Election Day, vote centers are open 7 a.m. to 8 p.m.</p>';
   }, next:["inperson","id","contact"] };
 
-  T.eligible = { label:"Am I eligible?", kw:["eligible","eligibility","can i vote","who can","qualify","citizen","felony","felon","age","old enough"], html: function(){
+  T.eligible = { label:"Am I eligible?", kw:["eligible","eligibility","can i vote","who is allowed","qualify","felony","felon","old enough","convicted","parole","probation"], html: function(){
     return '<p>You can register to vote in California if you are</p><ul><li>A U.S. citizen and a California resident</li><li>At least 18 years old on Election Day</li><li>Not currently serving a state or federal prison term for a felony</li><li>Not found mentally incompetent to vote by a court</li></ul>'
       + '<p>Not sure about your own situation? Call '+HOTLINE+' or your county elections office. They can answer questions about specific cases.</p>';
   }, next:["prereg","register","contact"] };
 
-  T.prereg = { label:"I’m 16 or 17", kw:["pre-register","preregister","pre register","16","17","teen","teenager","high school","under 18","not 18"], html: function(){
+  T.prereg = { label:"I’m 16 or 17", boost:3, kw:["i'm 17","im 17","i am 17","i'm 16","im 16","i am 16","16 or 17","17 years","16 years","pre-register","preregister","pre register","16","17","teen","teenager","high school","under 18","not 18"], html: function(){
     return '<p>You can <strong>pre-register</strong> at 16 or 17 if you meet the other requirements. Apply at '+REG+', and you will be registered automatically on your 18th birthday.</p><p>Pre-registering does not change the voting age. You still have to be 18 to cast a ballot.</p>';
   }, next:["eligible","register","contact"] };
 
@@ -160,35 +160,35 @@
       + '<p>Mail is slowing down now, so a drop box or vote center is the safest choice this close to Election Day. Sign your ballot envelope so it can be counted.</p>';
   }, next:["noballot","track","inperson","dates"] };
 
-  T.noballot = { label:"I didn’t get my ballot", kw:["didn't get","didnt get","not received","never received","haven't received","havent received","lost","replacement","missing","damaged","mistake","spoiled","new ballot"], html: function(){
+  T.noballot = { label:"I didn’t get my ballot", boost:14, kw:["never got","didn't receive","didnt receive","did not get","did not receive","havent gotten","haven't gotten","never came","no ballot","spilled","spill","ruined","stained","stain","tore","torn","ripped","destroyed","wet","messed up","filled out wrong","made a mistake","why haven't i received","why havent i received","haven't i received","havent i received","yet","hasn't come","hasnt come","hasn't arrived","hasnt arrived","when will i get my ballot","when will my ballot","didn't get","didnt get","not received","never received","haven't received","havent received","lost","replacement","missing","damaged","mistake","spoiled","new ballot"], html: function(){
     if(PHASE==="over") return overNote;
-    return '<p>You have options.</p><ul><li>Contact your county elections office right away to ask about a replacement ballot.</li><li>The last day to ask for a replacement by mail was October 27, but you can still vote in person at your county elections office or a vote center and get a ballot there.</li><li>Check '+STATUS+' to confirm your address and registration are current.</li></ul>'
+    return '<p>You have options.</p><ul><li>If it is damaged or spoiled, treat it the same as a missing ballot and ask for a replacement.</li><li>Contact your county elections office right away to ask about a replacement ballot.</li><li>The last day to ask for a replacement by mail was October 27, but you can still vote in person at your county elections office or a vote center and get a ballot there.</li><li>Check '+STATUS+' to confirm your address and registration are current.</li></ul><p>If it simply hasn’t shown up, two common reasons are an old address on file, because ballots are not forwarded, or registering after the October 19 mail deadline.</p>'
       + '<p>Not sure which county office to call? Ring '+HOTLINE+' and they will point you to it.</p>';
   }, next:["inperson","moved","contact"] };
 
-  T.track = { label:"Track my ballot", kw:["track","where's my ballot","wheres my ballot","was my ballot counted","received my ballot","counted"], html: function(){
+  T.track = { label:"Track my ballot", boost:6, kw:["got casted","casted","been cast","got cast","know if my ballot","tell if my ballot","check if my ballot","see if my ballot","know if my mail","tell if my mail","check if my mail","see if my mail","did my ballot","was my ballot","been received","got counted","been counted","did they get my ballot","track","where's my ballot","wheres my ballot","was my ballot counted","received my ballot","counted"], html: function(){
     return '<p>You can sign up for <strong>Where’s My Ballot?</strong> to get updates when your ballot is mailed, received, and counted. Start at '+A("https://california.ballottrax.net/voter/","california.ballottrax.net/voter")+'.</p><p>You can also check your registration at '+STATUS+'.</p>';
   }, next:["mail","status","contact"] };
 
   T.inperson = { label:"Voting in person", kw:["in person","in-person","vote center","polling","polling place","where do i vote","where to vote","early voting","early","hours","open","location","near me"], html: function(){
     if(PHASE==="over") return overNote;
-    return '<p>You can vote in person even if you got a mail ballot. Find the vote center, drop box, or polling place closest to you at '+CENTERS+'.</p>'
+    return '<p>You can vote in person even if you got a mail ballot. I can’t look up a ZIP code or address myself, but you can find the vote center, drop box, or polling place closest to you at '+CENTERS+'. Enter your address or county there.</p>'
       + '<ul><li>Early vote centers are generally open daily from 10 a.m. to 7 p.m. Some opened October 24 and the rest open October 31, so dates and hours vary a bit by county.</li>'
       + '<li>On Election Day, November 3, they are open <strong>7 a.m. to 8 p.m.</strong></li>'
       + '<li>If you are in line by 8 p.m., you can still vote.</li></ul>'
-      + '<p>Bring your mail ballot if you have it, or tell staff you want to vote there.</p>';
+      + '<p>Bring your mail ballot if you have it, or tell staff you want to vote there. Whether your county uses neighborhood polling places or larger vote centers, and the hours, can differ, so use the lookup above for your address.</p>';
   }, next:["id","late","mail","contact"] };
 
-  T.id = { label:"Do I need ID?", kw:["id","identification","photo id","driver","license","bring"], html: function(){
-    return '<p>Most California voters <strong>do not need to show ID</strong> to vote.</p><p>The exception is a first-time voter who registered by mail and did not give a driver’s license or ID number or the last four digits of a Social Security number. You may be asked to show ID, such as a photo ID or a document with your name and address. If you are unsure, bring one.</p><p>If you use same-day registration, bring ID or a document showing your name and address as well.</p>';
+  T.id = { label:"Do I need ID?", boost:0, strong:["photo id","which id","what id","bring id","show id","need id","need an id","id to vote","identification","lost my id","lost id","no id","passport","without id","without an id","lost my license","lost my driver","dont have id","don't have id"], kw:["id","identification","photo id","driver","license","bring","lost my id","lost id","no id","dont have id","don't have id","do not have id","passport","without id","without an id","lost my license","lost my driver"], html: function(){
+    return '<p>Most California voters <strong>do not need to show ID</strong> to vote.</p><p>The exception is a first-time voter who registered by mail and did not give a driver’s license or ID number or the last four digits of a Social Security number. You may be asked to show ID, such as a photo ID or a document with your name and address. If you are unsure, bring one.</p><p>If you use same-day registration, bring ID or a document showing your name and address as well. A lost ID or no passport is not a barrier for most voters. If you are asked, any document that shows your name and address can work, and your county elections office or '+HOTLINE+' can tell you what applies to you.</p>';
   }, next:["inperson","register","contact"] };
 
   T.moved = { label:"I moved or changed my name", kw:["moved","move","new address","address","change name","name change","married","party preference","re-register","reregister","update registration"], html: function(){
     return '<p>You need to <strong>re-register</strong> if you move, change your name, or want to change your political party preference.</p><p>Update it online at '+REG+'. Ballots are not forwarded in the mail, so an old address can mean a missed ballot.</p><p>If you are past the deadline, you can fix it in person with same-day registration at a county elections office or vote center.</p>';
   }, next:["late","status","contact"] };
 
-  T.language = { label:"Help in another language", kw:["spanish","espanol","español","chinese","hindi","japanese","khmer","korean","tagalog","thai","vietnamese","language","translate","interpreter"], html: function(){
-    return '<p>Voter information is available in 10 languages. The state registration form is offered in English, Spanish, Chinese, Hindi, Japanese, Khmer, Korean, Tagalog, Thai, and Vietnamese. You can call the Secretary of State’s voter hotline in each language.</p><ul>'
+  T.language = { label:"Help in another language", kw:["spanish","espanol","español","ayuda","donde","dónde","puedo","votar","registrarme","registrar","como","cómo","chinese","hindi","japanese","khmer","korean","tagalog","thai","vietnamese","language","translate","interpreter"], html: function(){
+    return '<p><strong>En español</strong> Puede llamar gratis a la línea de votantes al <a href="tel:+18002328682">(800) 232-VOTA (8682)</a>. También puede registrarse en '+REG+' (el sitio está disponible en español).</p><p>Voter information is available in 10 languages. The state registration form is offered in English, Spanish, Chinese, Hindi, Japanese, Khmer, Korean, Tagalog, Thai, and Vietnamese. You can call the Secretary of State’s voter hotline in each language.</p><ul>'
       + '<li>English <a href="tel:+18003458683">(800) 345-8683</a></li>'
       + '<li>Español <a href="tel:+18002328682">(800) 232-8682</a></li>'
       + '<li>中文 <a href="tel:+18003392857">(800) 339-2857</a></li>'
@@ -205,28 +205,68 @@
     return '<p>Statewide results are posted after the polls close at 8 p.m. on Election Day at '+A("https://electionresults.sos.ca.gov/","electionresults.sos.ca.gov")+'. Counting continues for days afterward as mailed ballots arrive.</p>';
   }, next:["track","contact"] };
 
-  T.guide = { label:"What’s on my ballot?", kw:["on my ballot","propositions","proposition","measures","voter guide","voter information guide","guide","candidates"], html: function(){
-    return '<p>The official Voter Information Guide explains the statewide contests and ballot measures. Read it online at '+A("https://voterguide.sos.ca.gov/","voterguide.sos.ca.gov")+'. Your county elections office can tell you about local contests.</p><p>I can’t recommend candidates or measures, but I’m happy to help with how and where to vote.</p>';
+  T.guide = { label:"What’s on my ballot?", kw:["on my ballot","propositions","proposition","measures","voter guide","voter information guide","guide","candidates","election about","what election","what is the election","whats the election","what's the election","who is running","governor","what am i voting"], html: function(){
+    return '<p>The November 3, 2026 General Election includes statewide offices such as Governor and Secretary of State, all U.S. House seats, the state legislature, and ballot propositions, plus local contests that depend on where you live.</p><p>The official Voter Information Guide explains the statewide contests and measures. Read it at '+A("https://voterguide.sos.ca.gov/","voterguide.sos.ca.gov")+'. I can’t see your personal ballot or local races, so your county elections office is the place to ask about those.</p><p>I can’t recommend candidates or measures, but I’m happy to help with how and where to vote.</p>';
   }, next:["inperson","mail","contact"] };
 
-  T.contact = { label:"Talk to a person", kw:["contact","phone","call","number","email","speak","human","person","representative","help","office","county","mailing address","write"], html: function(){
+  T.contact = { label:"Talk to a person", kw:["contact","phone","call","number","email","speak","human","person","representative","help","office","county","mailing address","write","who can i ask","who do i ask","closed","hotline","after hours","after work","work till","work until","office hours","nobody answers","no one answers"], html: function(){
     return '<p>I’m here around the clock, but if you need a person, here is who to reach.</p><ul>'
       + '<li><strong>Secretary of State voter hotline</strong> '+HOTLINE+'</li>'
       + '<li><strong>Email</strong> <a href="mailto:elections@sos.ca.gov">elections@sos.ca.gov</a></li>'
       + '<li><strong>Your county elections office</strong> This is where your registration record is kept and usually the quickest route for local questions. Find yours at '+SOS+'.</li></ul>'
-      + '<p>Hotline hours are limited, so for anything you can’t wait on, a vote center is staffed on Election Day from 7 a.m. to 8 p.m.</p>';
+      + '<p>If the hotline is closed when you are free, you can email, use this helper any time, or text <strong>VOTE</strong> to <strong>GOVOTE (468-683)</strong> to check your registration. For anything urgent, vote centers are staffed on Election Day from 7 a.m. to 8 p.m.</p>';
   }, next:["register","status","language"] };
 
-  T.opinion = { html: function(){
-    return '<p>I can’t say who or what to vote for. That choice is yours. I can help with registering, getting your ballot, and finding where to vote. The official Voter Information Guide at '+A("https://voterguide.sos.ca.gov/","voterguide.sos.ca.gov")+' explains what is on the ballot.</p>';
-  }, next:["guide","inperson","mail"], kw:["who should i vote","who to vote","democrat","republican","party should","best candidate","recommend a candidate"] };
+
+  T.citizen = { boost:4, kw:["green card","permanent resident","visa","not a citizen","noncitizen","non-citizen","immigrant","daca","legal resident","citizenship","naturalized"], html: function(){
+    return '<p>In California you must be a <strong>U.S. citizen</strong> to register to vote, so a green card or visa on its own does not make you eligible. If you have become a naturalized citizen, you can register like any other citizen.</p><p>Registering when you are not eligible can cause serious problems, so if you are unsure, call '+HOTLINE+' before you submit anything.</p>';
+  }, next:["eligible","contact","register"] };
+
+  T.notpossible = { boost:6, kw:["vote online","vote by email","vote by text","vote by phone","vote on my phone","vote on the internet","vote by internet","vote over the phone","vote through an app","online or by email","register by text","register by phone","register by email","register over the phone","text to register","by text message","vote by fax"], html: function(){
+    return '<p>You can’t cast your vote by email, text, phone, or an online form in California. Ballots are returned by mail, at a drop box, or in person.</p><p>You <strong>can</strong> register online at '+REG+'. Texting <strong>VOTE</strong> to <strong>GOVOTE (468-683)</strong> only checks your registration status and does not register you. To register on paper, call '+HOTLINE+' and ask for a form to be mailed to you.</p><p>Voters with disabilities can ask their county elections office about accessible vote-by-mail options.</p>';
+  }, next:["register","mail","status","contact"] };
+
+  T.requestballot = { boost:10, kw:["request my mail","request a ballot","request mail","request a mail","request my ballot","apply for a mail","sign up for mail","ask for a ballot","how do i get a ballot","how do i get my ballot","get my ballot","get a mail"], html: function(){
+    if(PHASE==="over") return overNote;
+    return '<p>You don’t need to request a ballot. California mails one automatically to every active registered voter, and counties began sending them by October 5.</p><p>If yours hasn’t arrived, tap “I didn’t get my ballot.” If you are not registered yet, register first, or use same-day registration at a vote center.</p>';
+  }, next:["noballot","late","status","mail"] };
+
+  T.local = { boost:4, kw:["unincorporated","city election","city elections","city council","local election","local elections","local race","local races","polling place or a vote center","polling place or vote center","vote center or polling","difference between a polling","depends on my county","depends on the county","does it depend on where"], html: function(){
+    return '<p>Some things are the same statewide, and some depend on your county or city. This helper can only speak to the statewide rules.</p><ul><li><strong>Same everywhere.</strong> Registration deadline, every registered voter getting a mail ballot, and polls open 7 a.m. to 8 p.m. on Election Day.</li><li><strong>Varies by county.</strong> Whether you vote at a neighborhood polling place or a larger vote center, early voting dates and hours, and the exact drop box and vote center locations.</li><li><strong>Varies by where you live.</strong> Which city, school, and district contests are on your ballot. Living in an unincorporated area usually means you vote on county and district contests but not city ones, but your county elections office can confirm for your address.</li></ul><p>Look up your own locations at '+CENTERS+', or ask your county elections office.</p>';
+  }, next:["inperson","guide","contact"] };
+
+  T.transit = { label:"Getting to the polls", boost:4, kw:["transit","bus","buses","train","trains","ride","rides","transportation","no car","get to the polls","get to the vote","get to vote","lyft","uber","metro","trolley","fare"], html: function(){
+    if(PHASE==="over") return overNote;
+    return '<p>There is no statewide free transit program in California. It is decided by each transit agency, so check yours.</p><p>Agencies I found announcing free rides on Election Day, November 3, 2026.</p><ul><li><strong>LA Metro</strong> all buses and trains, plus Metro Micro and Metro Bike Share</li><li><strong>North County Transit District (San Diego County)</strong> COASTER, SPRINTER, BREEZE and more. It does not include San Diego MTS.</li><li><strong>Marin Transit</strong> local buses</li><li><strong>Big Blue Bus (Santa Monica)</strong> system-wide</li></ul><p>Other agencies may offer it too, so check your local agency’s website. You may also not need a ride, because you can drop a mail ballot at a nearby drop box. Find locations at '+CENTERS+'.</p>';
+  }, next:["inperson","mail","contact"] };
+
+  T.away = { boost:6, strong:["out of the state","out of state","outside of california","outside california","different state","another state","other state","not in california","out of town"], kw:["college","student","students","out of state","out of the state","outside of california","outside california","different state","another state","other state","not in california","out of town","out of the country","away from home","dorm","campus","military","overseas","abroad","deployed","absentee"], html: function(){
+    if(PHASE==="over") return overNote;
+    return '<p>Your ballot is mailed to the address on your voter registration. If you are outside California, or your ballot did not reach you, here is what to do.</p><ul><li>Contact your county elections office right away, or call '+HOTLINE+' and ask for your county’s number. Ask whether a replacement can be sent to where you are now.</li><li>Mailed ballots count if they are postmarked by November 3 and reach your county within 7 days. Mail is tight this close to Election Day, so ask about the fastest option.</li><li>If you can get to a California vote center before 8 p.m. on November 3, you can vote in person there.</li><li>If you now live in another state, you register and vote there, not in California. Find your state’s process at '+A("https://vote.gov/","vote.gov")+'.</li><li>Military and overseas voters have their own forms. Start at '+SOS+'.</li></ul>';
+  }, next:["noballot","moved","contact"] };
+
+  T.otherstate = { boost:9, kw:["resident of florida","live in florida","living in florida","moved to florida","florida","resident of another state","resident of texas","not a california resident","no longer live in california","moved out of california","moved out of state","moved to another state","not a resident"], html: function(){
+    return '<p>You can vote in California only if you live here. If you are now a resident of another state, you register and vote in that state, where its own rules and deadlines apply. I can only help with California.</p><p>Find your state’s registration and voting information at '+A("https://vote.gov/","vote.gov")+', or contact your new state’s elections office. If you still have a California address you are returning to, I can help with that.</p>';
+  }, next:["eligible","moved","contact"] };
+
+  T.thirdparty = { boost:15, strong:["my sister","my brother","my daughter","my son","my husband","my wife","my mom","my dad","my mother","my father","filled out my","someone else filled"], kw:["filled out my","filled in my","filled out and mailed","someone else filled","someone else mailed","sister","brother","my daughter","my son","my husband","my wife","my spouse","my mom","my mother","my dad","my father","my roommate","my partner","her ballot","his ballot","their ballot","on my behalf"], html: function(){
+    return '<p>A ballot should be marked and signed by the voter it belongs to. Here is how that plays out.</p><ul><li><strong>If someone else filled out and mailed your ballot.</strong> Call your county elections office right away, explain what happened, and ask what options you have. If you think it may involve misuse of your voter information, you can report it to '+HOTLINE+'.</li><li><strong>If you want to send a ballot to a family member.</strong> It goes to the address on that person’s registration. If they live in another state, they should contact their county elections office to have it sent to them there. They must complete and sign it themselves. California lets a voter authorize someone else to return a completed ballot, but confirm the details with the county.</li></ul><p>I can’t give legal advice, and the county can tell you what applies to your situation.</p>';
+  }, next:["noballot","track","contact"] };
+
+  T.votematters = { boost:6, kw:["does my vote count","does my vote even count","does my vote matter","vote even count","blue state","red state","safe state","is it worth voting","why vote","does voting matter","my vote matter","will my vote count"], html: function(){
+    return '<p>Every valid ballot is counted, and each one counts the same no matter where you live.</p><p>This November, Californians are also deciding contests that are decided inside the state, such as Governor, the state legislature, U.S. House seats, local offices, and ballot propositions. Some of those races can be close. I can’t predict outcomes, so for what is at stake on your own ballot, see the Voter Information Guide at '+A("https://voterguide.sos.ca.gov/","voterguide.sos.ca.gov")+'.</p>';
+  }, next:["guide","inperson","mail"] };
+
+  T.opinion = { boost:5, html: function(){
+    return '<p>I can’t say who or what to vote for. That choice is yours. I can help with registering, getting your ballot, and finding where to vote.</p><p>For nonpartisan information on what is on your ballot, try these.</p><ul><li>The official Voter Information Guide at '+A("https://voterguide.sos.ca.gov/","voterguide.sos.ca.gov")+'</li><li>Vote411 from the League of Women Voters at '+A("https://www.vote411.org/","vote411.org")+'</li><li>The California Voter Foundation guide at '+A("https://calvoter.org/","calvoter.org")+'</li></ul>';
+  }, next:["guide","inperson","mail"], kw:["who do i vote for","who to pick","who to choose","which candidate","who is best","who should i vote","who to vote","democrat","republican","party should","best candidate","recommend a candidate"] };
 
   T.thanks = { html: function(){ return '<p>You’re welcome. Anything else I can help with?</p>'; }, next:["register","dates","mail","inperson"], kw:["thanks","thank you","thx","ty"] };
   T.hello  = { html: function(){ return T.greet.html(); }, next:T.greet.next, kw:["hello","hi","hey","good morning","good afternoon","start","menu"] };
 
   T.fallback = { html: function(){
-    return '<p>I’m not sure I understood that. Try one of the topics below, or reach a person at '+HOTLINE+'.</p>';
-  }, next:["register","dates","mail","inperson","status","contact"] };
+    return '<p>I’m not sure I understood that. Try rewording it with a few key words, such as “register,” “mail ballot,” “deadline,” or “vote center,” or tap a topic below. To reach a person, call '+HOTLINE+' or ask your county elections office.</p>';
+  }, next:["register","dates","mail","inperson","transit","contact"] };
 
   /* ---------- UI ---------- */
   var log = document.getElementById("log");
@@ -270,7 +310,7 @@
     }, wait);
   }
 
-  function norm(s){ return " " + s.toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿñæœ'\- ]/g," ").replace(/\s+/g," ").trim() + " "; }
+  function norm(s){ return " " + s.toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿñæœ' ]/g," ").replace(/\s+/g," ").trim() + " "; }
 
   function match(text){
     var s = norm(text), best = null, bestScore = 0;
@@ -281,7 +321,8 @@
         var needle = norm(k);
         if(s.indexOf(needle) !== -1) score += needle.trim().length > 3 ? 2 + needle.trim().split(" ").length : 1;
       });
-      if(id==="opinion" && score>0) score += 5;
+      if(score>0 && T[id].boost) score += T[id].boost;
+      if(T[id].strong){ T[id].strong.forEach(function(k){ if(s.indexOf(norm(k))!==-1) score += 20; }); }
       if(score > bestScore){ bestScore = score; best = id; }
     });
     return best;
